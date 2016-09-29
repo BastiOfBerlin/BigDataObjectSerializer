@@ -75,22 +75,20 @@ public class UnsafeHelper {
 			stepSize = BYTE_FIELD_SIZE;
 		}
 
-		// TODO: support double register mode
-
 		final long end = destOffset + len;
 		for (long offset = destOffset; offset < end;) {
 			switch (stepSize) {
 			case LONG_FIELD_SIZE:
-				getUnsafe().putLong(dest, offset, getUnsafe().getLong(srcOffset));
+				getUnsafe().putLong(dest, offset, getUnsafe().getLong(src, srcOffset));
 				break;
 			case INT_FIELD_SIZE:
-				getUnsafe().putInt(dest, offset, getUnsafe().getInt(srcOffset));
+				getUnsafe().putInt(dest, offset, getUnsafe().getInt(src, srcOffset));
 				break;
 			case SHORT_FIELD_SIZE:
-				getUnsafe().putShort(dest, offset, getUnsafe().getShort(srcOffset));
+				getUnsafe().putShort(dest, offset, getUnsafe().getShort(src, srcOffset));
 				break;
 			case BYTE_FIELD_SIZE:
-				getUnsafe().putByte(dest, offset, getUnsafe().getByte(srcOffset));
+				getUnsafe().putByte(dest, offset, getUnsafe().getByte(src, srcOffset));
 				break;
 			default:
 				break;
