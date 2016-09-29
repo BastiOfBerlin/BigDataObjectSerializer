@@ -17,8 +17,14 @@ public class UnsafeHelper {
 	public static final int	DOUBLE_FIELD_SIZE	= 8;
 	public static final int	FLOAT_FIELD_SIZE	= 4;
 
+	/** the unsafe */
 	private static Unsafe unsafe;
 
+	/**
+	 * Gets the unsafe.
+	 *
+	 * @return {@link Unsafe}
+	 */
 	public static Unsafe getUnsafe() {
 		if (unsafe == null) {
 			Field field;
@@ -69,6 +75,8 @@ public class UnsafeHelper {
 			stepSize = BYTE_FIELD_SIZE;
 		}
 
+		// TODO: support double register mode
+
 		final long end = destOffset + len;
 		for (long offset = destOffset; offset < end;) {
 			switch (stepSize) {
@@ -92,6 +100,13 @@ public class UnsafeHelper {
 		}
 	}
 
+	/**
+	 * Returns the size of an object out of the class header (offset 12 (0x0C)).<br>
+	 * <strong>Works only on 32-Bit Java 7 VMs!</strong>
+	 *
+	 * @param object Object to measure
+	 * @return size of the object
+	 */
 	public static long jvm7_32_sizeOf(final Object object) {
 		// This is getting the size out of the class header (at offset 12)
 		return getUnsafe().getAddress(normalize(getUnsafe().getInt(object, 4L)) + 12L);
@@ -172,7 +187,6 @@ public class UnsafeHelper {
 			}
 		} while ((clazz = clazz.getSuperclass()) != null);
 
-		// The whole class always pads to a 8 bytes boundary, so we round up to 8 bytes.
 		return roundUpTo8(maxSize);
 	}
 

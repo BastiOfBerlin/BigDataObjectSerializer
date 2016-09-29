@@ -7,12 +7,22 @@ import sun.misc.Unsafe;
 
 public class OffHeapSerializer<T extends Serializable> implements Serializable {
 
+	private static final long serialVersionUID = -6348155422688768649L;
+
+	/** start address of allocated memory */
 	private final long		address;
+	/** overall size of allocated memory */
 	private final long		memorySize;
+	/** offset of first field within object */
 	private final long		firstFieldOffset;
+	/** data size per element; <=> size of object excluding headers */
 	private final long		elementSize;
+	/** class to be saved */
 	private final Class<T>	baseClass;
 
+	/**
+	 * Size unit
+	 */
 	public enum SizeType {
 		BYTES, ELEMENTS
 	}
