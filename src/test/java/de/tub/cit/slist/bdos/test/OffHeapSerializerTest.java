@@ -27,7 +27,7 @@ public class OffHeapSerializerTest {
 	public void testSetGetNative() {
 		OffHeapSerializer<PrimitiveClass> serializer = null;
 		try {
-			serializer = new OffHeapSerializer<>(PrimitiveClass.class, 2);
+			serializer = new OffHeapSerializer<>(PrimitiveClass.class, INSTANCES);
 			setAndGet(serializer);
 		} finally {
 			if (serializer != null) {
@@ -40,7 +40,7 @@ public class OffHeapSerializerTest {
 	public void testSetGetByteArray() {
 		OffHeapSerializer<PrimitiveClass> serializer = null;
 		try {
-			serializer = new OffHeapSerializer<>(PrimitiveClass.class, 2, SizeType.ELEMENTS, MemoryLocation.BYTE_ARRAY);
+			serializer = new OffHeapSerializer<>(PrimitiveClass.class, INSTANCES, SizeType.ELEMENTS, MemoryLocation.BYTE_ARRAY);
 			setAndGet(serializer);
 		} finally {
 			if (serializer != null) {
