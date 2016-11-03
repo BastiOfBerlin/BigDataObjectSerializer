@@ -60,6 +60,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 		case NATIVE_MEMORY:
 		default:
 			this.address = getUnsafe().allocateMemory(this.memorySize);
+			getUnsafe().setMemory(address, this.memorySize, (byte) 0);
 			break;
 		case BYTE_ARRAY:
 			if (this.memorySize > Integer.MAX_VALUE) throw new IllegalArgumentException(
