@@ -13,6 +13,8 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	private final long		address;
 	/** overall size of allocated memory */
 	private final long		memorySize;
+	/** optional byte array, can be used instead of native (off-heap) memory */
+	private byte[]			backingArray	= null;
 	/** offset of first field within object */
 	private final long		firstFieldOffset;
 	/** data size per element; <=> size of object excluding headers */
@@ -27,10 +29,23 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 		BYTES, ELEMENTS
 	}
 
-	public OffHeapSerializer(final Class<T> baseClass, final long size, final SizeType sizeType) {
+	/**
+	 * Defines where the data are stored
+	 */
+	public enum MemoryLocation {
+		NATIVE_MEMORY, BYTE_ARRAY
+	}
+
+	public OffHeapSerializer(final Class<T> baseClass, final long size) {
+		this(baseClass, size, SizeType.ELEMENTS, MemoryLocation.NATIVE_MEMORY);
+	}
+
+	public OffHeapSerializer(final Class<T> baseClass, final long size, final SizeType sizeType, final MemoryLocation location) {
+		super();
 		this.baseClass = baseClass;
 		this.firstFieldOffset = UnsafeHelper.firstFieldOffset(baseClass);
 		this.elementSize = UnsafeHelper.sizeOf(baseClass) - this.firstFieldOffset;
+
 		switch (sizeType) {
 		case BYTES:
 			this.memorySize = size;
@@ -40,11 +55,23 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 			this.memorySize = size * this.elementSize;
 			break;
 		}
-		this.address = getUnsafe().allocateMemory(this.memorySize);
+
+		switch (location) {
+		case NATIVE_MEMORY:
+		default:
+			this.address = getUnsafe().allocateMemory(this.memorySize);
+			break;
+		case BYTE_ARRAY:
+			if (this.memorySize > Integer.MAX_VALUE) throw new IllegalArgumentException(
+					"When using BYTE_ARRAY location, max. memory size is " + Integer.MAX_VALUE + ", tried to allocate " + this.memorySize);
+			this.backingArray = new byte[(int) this.memorySize];
+			this.address = UnsafeHelper.toAddress(this.backingArray) + Unsafe.ARRAY_BYTE_BASE_OFFSET;
+			break;
+		}
 	}
 
 	public void set(final long idx, final T element) {
-		getUnsafe().copyMemory(element, firstFieldOffset, null, offset(idx), elementSize);
+		getUnsafe().copyMemory(element, firstFieldOffset, backingArray, offset(idx), elementSize);
 	}
 
 	public T get(final long idx) {
@@ -60,12 +87,27 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	}
 
 	public T get(final T dest, final long idx) {
-		UnsafeHelper.copyMemory(null, offset(idx), dest, firstFieldOffset, elementSize);
+		UnsafeHelper.copyMemory(backingArray, offset(idx), dest, firstFieldOffset, elementSize);
 		return dest;
 	}
 
+	public void destroy() {
+		if (backingArray != null) {
+			backingArray = null;
+		} else {
+			getUnsafe().freeMemory(address);
+		}
+	}
+
+	/**
+	 * Returns either relative or absolute memory offset of the element with index idx, depending on the presence of the backing array.<br />
+	 * This is necessary because access to on-heap memory has to be done using relative offset within the array.
+	 *
+	 * @param idx
+	 * @return
+	 */
 	private long offset(final long idx) {
-		return address + (idx * elementSize);
+		return (idx * elementSize) + (backingArray == null ? address : Unsafe.ARRAY_BYTE_BASE_OFFSET);
 	}
 
 	private static Unsafe getUnsafe() {

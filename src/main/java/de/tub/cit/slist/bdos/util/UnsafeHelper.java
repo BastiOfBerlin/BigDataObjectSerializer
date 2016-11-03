@@ -44,6 +44,21 @@ public class UnsafeHelper {
 	}
 
 	/**
+	 * Returns the address the object is located at
+	 *
+	 * <p>
+	 * WARNING: This does not return a pointer, so be warned pointer arithmetic will not work.
+	 *
+	 * @param obj The object
+	 * @return the address of the object
+	 */
+	public static long toAddress(final Object obj) {
+		final Object[] array = new Object[] { obj };
+		final long baseOffset = getUnsafe().arrayBaseOffset(Object[].class);
+		return normalize(getUnsafe().getInt(array, baseOffset));
+	}
+
+	/**
 	 * Returns the object located at the address.
 	 *
 	 * @param address The address

@@ -6,6 +6,7 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import de.tub.cit.slist.bdos.OffHeapSerializer;
+import de.tub.cit.slist.bdos.OffHeapSerializer.MemoryLocation;
 import de.tub.cit.slist.bdos.OffHeapSerializer.SizeType;
 import de.tub.cit.slist.bdos.test.classes.PrimitiveClass;
 import de.tub.cit.slist.bdos.util.UnsafeHelper;
@@ -23,8 +24,32 @@ public class OffHeapSerializerTest {
 	}
 
 	@Test
-	public void testGetSet() {
-		final OffHeapSerializer<PrimitiveClass> serializer = new OffHeapSerializer<>(PrimitiveClass.class, 2, SizeType.ELEMENTS);
+	public void testSetGetNative() {
+		OffHeapSerializer<PrimitiveClass> serializer = null;
+		try {
+			serializer = new OffHeapSerializer<>(PrimitiveClass.class, 2);
+			setAndGet(serializer);
+		} finally {
+			if (serializer != null) {
+				serializer.destroy();
+			}
+		}
+	}
+
+	@Test
+	public void testSetGetByteArray() {
+		OffHeapSerializer<PrimitiveClass> serializer = null;
+		try {
+			serializer = new OffHeapSerializer<>(PrimitiveClass.class, 2, SizeType.ELEMENTS, MemoryLocation.BYTE_ARRAY);
+			setAndGet(serializer);
+		} finally {
+			if (serializer != null) {
+				serializer.destroy();
+			}
+		}
+	}
+
+	private void setAndGet(final OffHeapSerializer<PrimitiveClass> serializer) {
 		final PrimitiveClass[] ref = new PrimitiveClass[INSTANCES];
 		for (int i = 0; i < INSTANCES; i++) {
 			final PrimitiveClass instance = new PrimitiveClass(r);
