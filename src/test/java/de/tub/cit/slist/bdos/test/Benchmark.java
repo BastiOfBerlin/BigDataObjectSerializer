@@ -36,7 +36,7 @@ public class Benchmark {
 		}
 		shuffleArray(setOrder);
 		end = System.currentTimeMillis();
-		System.out.println("Time for setup:\t\t" + (end - start) + "ms");
+		System.out.format("Time for setup:\t\t\t\t%,7dms\n", end - start);
 	}
 
 	@AfterClass
@@ -48,18 +48,24 @@ public class Benchmark {
 	@Test
 	public void randomSetGet() {
 		final long fillOffHeapTime = fill(offHeapSerializer);
-		System.out.println("Time for fill (off-heap):\t" + fillOffHeapTime + "ms");
+		System.out.format("Time for fill (off-heap):\t\t%,7dms\n", fillOffHeapTime);
 		final long fillOnHeapTime = fill(byteArraySerializer);
-		System.out.println("Time for fill (on-heap):\t" + fillOnHeapTime + "ms");
+		System.out.format("Time for fill  (on-heap):\t\t%,7dms\n", fillOnHeapTime);
 		final long readOffHeapTime = read(offHeapSerializer);
-		System.out.println("Time for read (off-heap):\t" + readOffHeapTime + "ms");
+		System.out.format("Time for read (off-heap):\t\t%,7dms\n", readOffHeapTime);
 		final long readOnHeapTime = read(byteArraySerializer);
-		System.out.println("Time for read (on-heap):\t" + readOnHeapTime + "ms");
-		System.out.println("--------------------------------------");
-		System.out.println("Fill per element (off-heap):\t" + ((double) fillOffHeapTime / INSTANCES) + "ms");
-		System.out.println("Fill per element (on-heap):\t" + ((double) fillOnHeapTime / INSTANCES) + "ms");
-		System.out.println("Read per element (off-heap):\t" + ((double) readOffHeapTime / ITERATIONS) + "ms");
-		System.out.println("Read per element (on-heap):\t" + ((double) readOnHeapTime / ITERATIONS) + "ms");
+		System.out.format("Time for read  (on-heap):\t\t%,7dms\n", readOnHeapTime);
+		final long readOffHeapPreallocated = readPreallocated(offHeapSerializer);
+		System.out.format("Time for read preallocated (off-heap):\t%,7dms\n", readOffHeapPreallocated);
+		final long readOnHeapPreallocated = readPreallocated(byteArraySerializer);
+		System.out.format("Time for read preallocated  (on-heap):\t%,7dms\n", readOnHeapPreallocated);
+		System.out.println("-------------------------------------------------");
+		System.out.format("Fills (off-heap):\t\t%#,14.2f per second\n", (INSTANCES / (double) fillOffHeapTime * 1000));
+		System.out.format("Fills  (on-heap):\t\t%#,14.2f per second\n", (INSTANCES / (double) fillOnHeapTime * 1000));
+		System.out.format("Reads (off-heap):\t\t%#,14.2f per second\n", (INSTANCES / (double) readOffHeapTime * 1000));
+		System.out.format("Reads  (on-heap):\t\t%#,14.2f per second\n", (INSTANCES / (double) readOnHeapTime * 1000));
+		System.out.format("Reads preallocated (off-heap):\t%#,14.2f per second\n", (INSTANCES / (double) readOffHeapPreallocated * 1000));
+		System.out.format("Reads preallocated  (on-heap):\t%#,14.2f per second\n", (INSTANCES / (double) readOnHeapPreallocated * 1000));
 	}
 
 	private long fill(final OffHeapSerializer<PrimitiveClass> serializer) {
@@ -75,11 +81,25 @@ public class Benchmark {
 	private long read(final OffHeapSerializer<PrimitiveClass> serializer) {
 		long start, end;
 		for (int i = 0; i < WARMUP; i++) {
-			serializer.get(getOrder[i]);
+			serializer.get(getOrder[i % INSTANCES]);
 		}
 		start = System.currentTimeMillis();
 		for (int i = WARMUP; i < ITERATIONS + WARMUP; i++) {
-			serializer.get(getOrder[i]);
+			serializer.get(getOrder[i % INSTANCES]);
+		}
+		end = System.currentTimeMillis();
+		return end - start;
+	}
+
+	private long readPreallocated(final OffHeapSerializer<PrimitiveClass> serializer) {
+		long start, end;
+		final PrimitiveClass dest = new PrimitiveClass();
+		for (int i = 0; i < WARMUP; i++) {
+			serializer.get(dest, getOrder[i % INSTANCES]);
+		}
+		start = System.currentTimeMillis();
+		for (int i = WARMUP; i < ITERATIONS + WARMUP; i++) {
+			serializer.get(dest, getOrder[i % INSTANCES]);
 		}
 		end = System.currentTimeMillis();
 		return end - start;
