@@ -63,4 +63,16 @@ public class OffHeapSerializerTest {
 		}
 	}
 
+	@Test(expected = AssertionError.class)
+	public void testZeroSize() {
+		final OffHeapSerializer<PrimitiveClass> serializer = new OffHeapSerializer<>(PrimitiveClass.class, 0);
+		serializer.set(0, new PrimitiveClass(r));
+	}
+
+	@Test(expected = IndexOutOfBoundsException.class)
+	public void testIndexOutOfBoundsException() {
+		final OffHeapSerializer<PrimitiveClass> serializer = new OffHeapSerializer<>(PrimitiveClass.class, 1);
+		serializer.set(1, new PrimitiveClass(r));
+	}
+
 }

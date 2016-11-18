@@ -13,6 +13,8 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	private final long		address;
 	/** overall size of allocated memory */
 	private final long		memorySize;
+	/** max number of elements */
+	private final long		maxElementCount;
 	/** optional byte array, can be used instead of native (off-heap) memory */
 	private byte[]			backingArray	= null;
 	/** offset of first field within object */
@@ -42,6 +44,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 
 	public OffHeapSerializer(final Class<T> baseClass, final long size, final SizeType sizeType, final MemoryLocation location) {
 		super();
+		assert (size > 0);
 		this.baseClass = baseClass;
 		this.firstFieldOffset = UnsafeHelper.firstFieldOffset(baseClass);
 		this.elementSize = UnsafeHelper.sizeOf(baseClass) - this.firstFieldOffset;
@@ -49,10 +52,12 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 		switch (sizeType) {
 		case BYTES:
 			this.memorySize = size;
+			this.maxElementCount = size / this.elementSize;
 			break;
 		case ELEMENTS:
 		default:
 			this.memorySize = size * this.elementSize;
+			this.maxElementCount = size;
 			break;
 		}
 
@@ -72,10 +77,12 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	}
 
 	public void set(final long idx, final T element) {
+		checkIndexBounds(idx);
 		getUnsafe().copyMemory(element, firstFieldOffset, backingArray, offset(idx), elementSize);
 	}
 
 	public T get(final long idx) {
+		checkIndexBounds(idx);
 		try {
 			@SuppressWarnings("unchecked")
 			final T obj = (T) getUnsafe().allocateInstance(baseClass);
@@ -88,8 +95,13 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	}
 
 	public T get(final T dest, final long idx) {
+		checkIndexBounds(idx);
 		UnsafeHelper.copyMemory(backingArray, offset(idx), dest, firstFieldOffset, elementSize);
 		return dest;
+	}
+
+	private void checkIndexBounds(final long idx) {
+		if (idx >= maxElementCount) throw new IndexOutOfBoundsException(String.format("Tried to access index '%d', max index is '%d'.", idx, maxElementCount));
 	}
 
 	public void destroy() {
