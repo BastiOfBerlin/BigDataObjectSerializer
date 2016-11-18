@@ -76,17 +76,32 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 		}
 	}
 
-	public void set(final long idx, final T element) {
+	/**
+	 * Sets an element in a random access manner (Array-like).<br />
+	 * <strong>WARNING!</strong> This is not compatible with List-access. Only one mode must be used!
+	 * 
+	 * @param idx
+	 * @param element
+	 */
+	public void setRandomAccess(final long idx, final T element) {
 		checkIndexBounds(idx);
 		getUnsafe().copyMemory(element, firstFieldOffset, backingArray, offset(idx), elementSize);
 	}
 
-	public T get(final long idx) {
+	/**
+	 * Gets an element in a random access manner (Array-like). in contrast to {@link #getRandomAccess(Serializable, long)}, this method allocates a new Object
+	 * and therefore is slightly slower. So if you can reuse objects, you should use that method.<br />
+	 * <strong>WARNING!</strong> This is not compatible with List-access. Only one mode must be used!
+	 * 
+	 * @param idx
+	 * @return the element
+	 */
+	public T getRandomAccess(final long idx) {
 		checkIndexBounds(idx);
 		try {
 			@SuppressWarnings("unchecked")
 			final T obj = (T) getUnsafe().allocateInstance(baseClass);
-			return get(obj, idx);
+			return getRandomAccess(obj, idx);
 		} catch (final InstantiationException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -94,7 +109,16 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 		return null;
 	}
 
-	public T get(final T dest, final long idx) {
+	/**
+	 * Gets an element in a random access manner (Array-like). This method is faster than {@link #getRandomAccess(long)} because no Object allocation needs to
+	 * be done.<br />
+	 * <strong>WARNING!</strong> This is not compatible with List-access. Only one mode must be used!
+	 * 
+	 * @param dest pre-allocated destination object
+	 * @param idx
+	 * @return the element
+	 */
+	public T getRandomAccess(final T dest, final long idx) {
 		checkIndexBounds(idx);
 		UnsafeHelper.copyMemory(backingArray, offset(idx), dest, firstFieldOffset, elementSize);
 		return dest;

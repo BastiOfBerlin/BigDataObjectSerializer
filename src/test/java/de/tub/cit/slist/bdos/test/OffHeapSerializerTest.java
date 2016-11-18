@@ -55,24 +55,24 @@ public class OffHeapSerializerTest {
 			final PrimitiveClass instance = new PrimitiveClass(r);
 			ref[i] = instance;
 			System.out.println(instance);
-			serializer.set(i, instance);
+			serializer.setRandomAccess(i, instance);
 		}
 		for (int i = 0; i < INSTANCES; i++) {
 			// Assert.assertSame(ref[i], serializer.get(i));
-			Assert.assertEquals(ref[i], serializer.get(i));
+			Assert.assertEquals(ref[i], serializer.getRandomAccess(i));
 		}
 	}
 
 	@Test(expected = AssertionError.class)
 	public void testZeroSize() {
 		final OffHeapSerializer<PrimitiveClass> serializer = new OffHeapSerializer<>(PrimitiveClass.class, 0);
-		serializer.set(0, new PrimitiveClass(r));
+		serializer.setRandomAccess(0, new PrimitiveClass(r));
 	}
 
 	@Test(expected = IndexOutOfBoundsException.class)
 	public void testIndexOutOfBoundsException() {
 		final OffHeapSerializer<PrimitiveClass> serializer = new OffHeapSerializer<>(PrimitiveClass.class, 1);
-		serializer.set(1, new PrimitiveClass(r));
+		serializer.setRandomAccess(1, new PrimitiveClass(r));
 	}
 
 }

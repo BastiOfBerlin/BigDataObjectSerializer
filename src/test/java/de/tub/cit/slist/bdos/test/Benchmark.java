@@ -72,7 +72,7 @@ public class Benchmark {
 		long start, end;
 		start = System.currentTimeMillis();
 		for (int i = 0; i < INSTANCES; i++) {
-			serializer.set(setOrder[i], ref[i]);
+			serializer.setRandomAccess(setOrder[i], ref[i]);
 		}
 		end = System.currentTimeMillis();
 		return end - start;
@@ -81,11 +81,11 @@ public class Benchmark {
 	private long read(final OffHeapSerializer<PrimitiveClass> serializer) {
 		long start, end;
 		for (int i = 0; i < WARMUP; i++) {
-			serializer.get(getOrder[i % INSTANCES]);
+			serializer.getRandomAccess(getOrder[i % INSTANCES]);
 		}
 		start = System.currentTimeMillis();
 		for (int i = WARMUP; i < ITERATIONS + WARMUP; i++) {
-			serializer.get(getOrder[i % INSTANCES]);
+			serializer.getRandomAccess(getOrder[i % INSTANCES]);
 		}
 		end = System.currentTimeMillis();
 		return end - start;
@@ -95,11 +95,11 @@ public class Benchmark {
 		long start, end;
 		final PrimitiveClass dest = new PrimitiveClass();
 		for (int i = 0; i < WARMUP; i++) {
-			serializer.get(dest, getOrder[i % INSTANCES]);
+			serializer.getRandomAccess(dest, getOrder[i % INSTANCES]);
 		}
 		start = System.currentTimeMillis();
 		for (int i = WARMUP; i < ITERATIONS + WARMUP; i++) {
-			serializer.get(dest, getOrder[i % INSTANCES]);
+			serializer.getRandomAccess(dest, getOrder[i % INSTANCES]);
 		}
 		end = System.currentTimeMillis();
 		return end - start;
