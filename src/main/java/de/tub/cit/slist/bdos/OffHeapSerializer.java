@@ -5,9 +5,11 @@ import java.io.Serializable;
 import de.tub.cit.slist.bdos.util.UnsafeHelper;
 import sun.misc.Unsafe;
 
-public class OffHeapSerializer<T extends Serializable> implements Serializable {
+public class OffHeapSerializer<T extends Serializable> implements java.io.Serializable {
 
-	private static final long serialVersionUID = -6348155422688768649L;
+	private static final long	serialVersionUID	= -6348155422688768649L;
+	/** 1 Byte Status + 2x8 Bytes pointer prev/next */
+	private static final int	METADATA_BYTES		= 17;
 
 	/** start address of allocated memory */
 	private final long		address;
@@ -21,6 +23,8 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	private final long		firstFieldOffset;
 	/** data size per element; <=> size of object excluding headers */
 	private final long		elementSize;
+	/** size of element and meta data */
+	private final long		nodeSize;
 	/** class to be saved */
 	private final Class<T>	baseClass;
 
@@ -48,15 +52,16 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 		this.baseClass = baseClass;
 		this.firstFieldOffset = UnsafeHelper.firstFieldOffset(baseClass);
 		this.elementSize = UnsafeHelper.sizeOf(baseClass) - this.firstFieldOffset;
+		this.nodeSize = this.elementSize + METADATA_BYTES;
 
 		switch (sizeType) {
 		case BYTES:
 			this.memorySize = size;
-			this.maxElementCount = size / this.elementSize;
+			this.maxElementCount = size / this.nodeSize;
 			break;
 		case ELEMENTS:
 		default:
-			this.memorySize = size * this.elementSize;
+			this.memorySize = size * this.nodeSize;
 			this.maxElementCount = size;
 			break;
 		}
@@ -79,7 +84,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	/**
 	 * Sets an element in a random access manner (Array-like).<br />
 	 * <strong>WARNING!</strong> This is not compatible with List-access. Only one mode must be used!
-	 * 
+	 *
 	 * @param idx
 	 * @param element
 	 */
@@ -92,7 +97,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	 * Gets an element in a random access manner (Array-like). in contrast to {@link #getRandomAccess(Serializable, long)}, this method allocates a new Object
 	 * and therefore is slightly slower. So if you can reuse objects, you should use that method.<br />
 	 * <strong>WARNING!</strong> This is not compatible with List-access. Only one mode must be used!
-	 * 
+	 *
 	 * @param idx
 	 * @return the element
 	 */
@@ -113,7 +118,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	 * Gets an element in a random access manner (Array-like). This method is faster than {@link #getRandomAccess(long)} because no Object allocation needs to
 	 * be done.<br />
 	 * <strong>WARNING!</strong> This is not compatible with List-access. Only one mode must be used!
-	 * 
+	 *
 	 * @param dest pre-allocated destination object
 	 * @param idx
 	 * @return the element
@@ -144,11 +149,10 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	 * @return
 	 */
 	private long offset(final long idx) {
-		return (idx * elementSize) + (backingArray == null ? address : Unsafe.ARRAY_BYTE_BASE_OFFSET);
+		return (idx * nodeSize) + METADATA_BYTES + (backingArray == null ? address : Unsafe.ARRAY_BYTE_BASE_OFFSET);
 	}
 
 	private static Unsafe getUnsafe() {
 		return UnsafeHelper.getUnsafe();
 	}
-
 }
