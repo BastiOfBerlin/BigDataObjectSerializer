@@ -6,4 +6,12 @@ cache:
     - $HOME/.m2
 branches:
   only:
-  - master
+    - master
+deploy:
+  provider: releases
+  api_key: "d9dd3242c5012e9432eb3cecb632bae894657b37"
+  file:
+    - "BigDataObjectSerializer.jar"
+  skip_cleanup: true
+  on:
+    tags: true
