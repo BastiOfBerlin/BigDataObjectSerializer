@@ -40,7 +40,7 @@ public class OffHeapSerializerTest {
 	public void testSetGetByteArray() {
 		OffHeapSerializer<PrimitiveClass> serializer = null;
 		try {
-			serializer = new OffHeapSerializer<>(PrimitiveClass.class, INSTANCES, SizeType.ELEMENTS, MemoryLocation.BYTE_ARRAY);
+			serializer = new OffHeapSerializer<>(PrimitiveClass.class, INSTANCES, SizeType.ELEMENTS, MemoryLocation.BYTE_ARRAY, 0);
 			setAndGet(serializer);
 		} finally {
 			if (serializer != null) {
@@ -73,6 +73,36 @@ public class OffHeapSerializerTest {
 	public void testIndexOutOfBoundsException() {
 		final OffHeapSerializer<PrimitiveClass> serializer = new OffHeapSerializer<>(PrimitiveClass.class, 1);
 		serializer.setRandomAccess(1, new PrimitiveClass(r));
+	}
+
+	@Test
+	public void testGetNull() {
+		final OffHeapSerializer<PrimitiveClass> serializer = new OffHeapSerializer<>(PrimitiveClass.class, 1);
+		Assert.assertNull(serializer.getRandomAccess(0));
+		Assert.assertTrue(serializer.isNull(0));
+		final PrimitiveClass instance = new PrimitiveClass(r);
+		serializer.setRandomAccess(0, instance);
+		Assert.assertNotNull(serializer.getRandomAccess(0));
+		Assert.assertFalse(serializer.isNull(0));
+		serializer.setRandomAccess(0, null);
+		Assert.assertNull(serializer.getRandomAccess(0));
+		Assert.assertTrue(serializer.isNull(0));
+	}
+
+	@Test(expected = IllegalArgumentException.class)
+	public void testSetReservedFlag() {
+		final OffHeapSerializer<PrimitiveClass> serializer = new OffHeapSerializer<>(PrimitiveClass.class, 1);
+		serializer.setFlag(0, (byte) 0b00000001);
+	}
+
+	@Test
+	public void testSetFlag() {
+		final OffHeapSerializer<PrimitiveClass> serializer = new OffHeapSerializer<>(PrimitiveClass.class, 1);
+		final byte mask = (byte) 0b01000000;
+		serializer.setFlag(0, mask);
+		Assert.assertTrue(serializer.checkFlag(0, mask));
+		serializer.unsetFlag(0, mask);
+		Assert.assertFalse(serializer.checkFlag(0, mask));
 	}
 
 }
