@@ -91,6 +91,19 @@ public class ListTest {
 	}
 
 	@Test
+	public void testRemoveObject() {
+		list.addAll(ref);
+		final List<PrimitiveClass> localRef = new ArrayList<>();
+		localRef.addAll(ref);
+		for (int i = 0; i < (r.nextInt(LIST_SIZE - 1) + 1); i++) {
+			final int idx = r.nextInt(localRef.size());
+			localRef.remove(localRef.get(idx));
+			list.remove(list.get(idx));
+		}
+		assertListsEqual(localRef);
+	}
+
+	@Test
 	public void testIndexOf() {
 		list.addAll(ref);
 		final int idx = r.nextInt(ref.size());
