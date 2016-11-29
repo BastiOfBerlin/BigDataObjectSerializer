@@ -3,6 +3,7 @@ package de.tub.cit.slist.bdos.test;
 import java.util.Random;
 
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import de.tub.cit.slist.bdos.OffHeapSerializer;
@@ -15,6 +16,7 @@ public class OffHeapSerializerTest {
 	private static final int	INSTANCES	= 2;
 	private static final Random	r			= new Random();
 
+	@Ignore
 	@Test
 	public void testSizeof() {
 		System.out.println("Header size:      " + UnsafeHelper.headerSize(PrimitiveClass.class));
@@ -54,7 +56,7 @@ public class OffHeapSerializerTest {
 		for (int i = 0; i < INSTANCES; i++) {
 			final PrimitiveClass instance = new PrimitiveClass(r);
 			ref[i] = instance;
-			System.out.println(instance);
+			// System.out.println(instance);
 			serializer.setRandomAccess(i, instance);
 		}
 		for (int i = 0; i < INSTANCES; i++) {
