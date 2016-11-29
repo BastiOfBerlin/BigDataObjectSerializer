@@ -365,14 +365,20 @@ public class BigDataLinkedList<T extends Serializable> extends AbstractSequentia
 
 	@Override
 	public boolean offerFirst(final T e) {
+		if (isFull()) return false;
 		addFirst(e);
 		return true;
 	}
 
 	@Override
 	public boolean offerLast(final T e) {
+		if (isFull()) return false;
 		addLast(e);
 		return true;
+	}
+
+	private boolean isFull() {
+		return size >= serializer.getMaxElementCount();
 	}
 
 	@Override
@@ -541,6 +547,7 @@ public class BigDataLinkedList<T extends Serializable> extends AbstractSequentia
 
 	@Override
 	public boolean offer(final T e) {
+		if (isFull()) return false;
 		return add(e);
 	}
 
