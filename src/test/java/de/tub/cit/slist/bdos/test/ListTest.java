@@ -58,6 +58,20 @@ public class ListTest {
 	}
 
 	@Test
+	public void testAddIndex() {
+		list.addAll(ref);
+		final List<PrimitiveClass> localRef = new ArrayList<>();
+		localRef.addAll(ref);
+		list.remove(0);
+		localRef.remove(0);
+		final int idx = r.nextInt(LIST_SIZE);
+		final PrimitiveClass instance = new PrimitiveClass(r);
+		list.add(idx, instance);
+		localRef.add(idx, instance);
+		assertListsEqual(localRef);
+	}
+
+	@Test
 	public void testAddAll() {
 		list.addAll(ref);
 		assertListsEqual();
