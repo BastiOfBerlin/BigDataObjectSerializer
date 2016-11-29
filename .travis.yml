@@ -18,4 +18,4 @@ deploy:
   on:
     tags: true
 addons:
-  srcclr: true
+  srcclr: false
