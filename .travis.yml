@@ -1,6 +1,7 @@
 language: java
+sudo: false
 jdk: oraclejdk8
-script: mvn test package
+#script: mvn test package
 cache:
   directories:
   - "$HOME/.m2"
