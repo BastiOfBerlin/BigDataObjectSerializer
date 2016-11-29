@@ -3,17 +3,18 @@ jdk: oraclejdk8
 script: mvn test package
 cache:
   directories:
-    - $HOME/.m2
+  - "$HOME/.m2"
 branches:
   only:
-    - master
+  - master
 deploy:
   provider: releases
-  api_key: "d9dd3242c5012e9432eb3cecb632bae894657b37"
+  api_key:
+    secure: Tcsb2METmEpNxOl8LgVVcbQ2Fz/moGl6RjejmT4pc2zZ9xl2AIbkeU7Crajgj1ajzTW8Un3unS+t35OMbQa6odzKEG5JDHmGmLlQAfkQ5rEW+FUOBx3U1ZFHsWNbTUwfS3LvSLsbME+eQdhpo08mKEzutX0FsNi9aHyMa1z8lmPu4p1vNdn/tqwfUeCyzLTu6rLDpVMgfno8kEBk5I6yPRzqsMyajbfLUZvKCb8Dwaww6NIVccr5U4nu64VTYH+56S21Pkw/yWLHLhLe2C8ZyNJ01PP11oBJ3k9eFHJpekz49y+dTiE3L73M3tXhXk02Vadu9QOumjmTxZ95i2Hs2d426re2J31+JZ/ex4FUiCDoEMLQ9hhnXhsSnuQ4jQ1g0XbGlTO+1UiBB96Zv0hZG82ZEeCB4ML5rvH2usgA+uAyfakIu+A0RtTWjOupEVG/a+QY2nyVKyBvNA1czhG5JiDWLC8Tu+xexM0ddaUvYQcImXUjwS2NIWzT1A4ATtolWs5/q8VyiL6aXOnv/38Vvgw1F5tPv1Yh/D88Dz+rqH0MQC/b2s6gk3k3Sum8TOtxUe1++TGWPtoCfmn4YDuIem8ajyWUj1kA3iGZrWBV+DrtIAbqvJMxcdEy7U0XYkddYuuqqfgd4zHPwQoTjNxiGe3WU2JRNJBNCGZqDCJZtqc=
   file:
-    - "BigDataObjectSerializer.jar"
+  - BigDataObjectSerializer.jar
   skip_cleanup: true
   on:
     tags: true
 addons:
-    srcclr: true
+  srcclr: true
