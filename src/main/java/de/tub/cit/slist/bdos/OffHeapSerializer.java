@@ -372,4 +372,10 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 		return elementSize;
 	}
 
+	@Override
+	protected void finalize() throws Throwable {
+		destroy();
+		super.finalize();
+	}
+
 }

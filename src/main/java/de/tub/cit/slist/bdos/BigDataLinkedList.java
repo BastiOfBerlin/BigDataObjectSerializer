@@ -35,8 +35,9 @@ public class BigDataLinkedList<T extends Serializable> extends AbstractSequentia
 	private int	size		= 0;
 	/** index offset to first element */
 	private int	first		= -1;
+
 	/** index offset to last element */
-	private int	last		= -1;
+	private int last = -1;
 
 	public BigDataLinkedList(final Class<T> baseClass, final long size, final SizeType sizeType, final MemoryLocation location) {
 		this.baseClass = baseClass;
@@ -866,5 +867,11 @@ public class BigDataLinkedList<T extends Serializable> extends AbstractSequentia
 		public void remove() {
 			itr.remove();
 		}
+	}
+
+	@Override
+	protected void finalize() throws Throwable {
+		serializer.destroy();
+		super.finalize();
 	}
 }
