@@ -13,8 +13,7 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.function.Consumer;
 
-import de.tub.cit.slist.bdos.conf.MemoryLocation;
-import de.tub.cit.slist.bdos.conf.SizeType;
+import de.tub.cit.slist.bdos.conf.OHSConfig;
 import de.tub.cit.slist.bdos.util.BigDataCollectionHelper;
 import de.tub.cit.slist.bdos.util.UnsafeHelper;
 
@@ -39,9 +38,9 @@ public class BigDataLinkedList<T extends Serializable> extends AbstractSequentia
 	/** index offset to last element */
 	private int last = -1;
 
-	public BigDataLinkedList(final Class<T> baseClass, final long size, final SizeType sizeType, final MemoryLocation location) {
+	public BigDataLinkedList(final Class<T> baseClass, final OHSConfig config) {
 		this.baseClass = baseClass;
-		serializer = new OffHeapSerializer<>(baseClass, size, sizeType, location, METADATA_BYTES);
+		serializer = new OffHeapSerializer<>(baseClass, config, METADATA_BYTES);
 	}
 
 	private int getNextPointer(final int idx) {

@@ -14,8 +14,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import de.tub.cit.slist.bdos.BigDataLinkedList;
-import de.tub.cit.slist.bdos.conf.MemoryLocation;
-import de.tub.cit.slist.bdos.conf.SizeType;
+import de.tub.cit.slist.bdos.conf.ConfigFactory;
 import de.tub.cit.slist.bdos.test.classes.PrimitiveClass;
 
 public class DequeTest {
@@ -29,7 +28,7 @@ public class DequeTest {
 
 	@BeforeClass
 	public static void setUpBeforeClass() throws Exception {
-		linkedList = new BigDataLinkedList<>(PrimitiveClass.class, LIST_SIZE, SizeType.ELEMENTS, MemoryLocation.NATIVE_MEMORY);
+		linkedList = new BigDataLinkedList<>(PrimitiveClass.class, (new ConfigFactory()).withSize(LIST_SIZE).build());
 		deque = (linkedList);
 		ref = new LinkedList<>();
 		for (int i = 0; i < LIST_SIZE - FREE_SLOTS; i++) {

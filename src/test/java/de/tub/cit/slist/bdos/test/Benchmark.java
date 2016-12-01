@@ -7,6 +7,8 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import de.tub.cit.slist.bdos.OffHeapSerializer;
+import de.tub.cit.slist.bdos.conf.ConfigFactory;
+import de.tub.cit.slist.bdos.conf.MemoryLocation;
 import de.tub.cit.slist.bdos.test.classes.PrimitiveClass;
 
 public class Benchmark {
@@ -25,8 +27,9 @@ public class Benchmark {
 	public static void setUpBeforeClass() throws Exception {
 		long start, end;
 		start = System.currentTimeMillis();
-		offHeapSerializer = new OffHeapSerializer<>(PrimitiveClass.class, INSTANCES);
-		byteArraySerializer = new OffHeapSerializer<>(PrimitiveClass.class, INSTANCES);
+		offHeapSerializer = new OffHeapSerializer<>(PrimitiveClass.class, (new ConfigFactory()).withSize(INSTANCES).build(), 0);
+		byteArraySerializer = new OffHeapSerializer<>(PrimitiveClass.class,
+				(new ConfigFactory()).withSize(INSTANCES).withLocation(MemoryLocation.BYTE_ARRAY).build(), 0);
 		for (int i = 0; i < INSTANCES; i++) {
 			ref[i] = new PrimitiveClass(r);
 			setOrder[i] = i;

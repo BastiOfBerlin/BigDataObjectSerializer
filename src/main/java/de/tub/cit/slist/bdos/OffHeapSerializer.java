@@ -3,8 +3,8 @@ package de.tub.cit.slist.bdos;
 import java.io.Serializable;
 import java.lang.reflect.UndeclaredThrowableException;
 
-import de.tub.cit.slist.bdos.conf.MemoryLocation;
-import de.tub.cit.slist.bdos.conf.SizeType;
+import de.tub.cit.slist.bdos.conf.ConfigFactory;
+import de.tub.cit.slist.bdos.conf.OHSConfig;
 import de.tub.cit.slist.bdos.util.UnsafeHelper;
 import sun.misc.Unsafe;
 
@@ -40,12 +40,13 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	/** class to be saved */
 	private final Class<T>	baseClass;
 
-	public OffHeapSerializer(final Class<T> baseClass, final long size) {
-		this(baseClass, size, SizeType.ELEMENTS, MemoryLocation.NATIVE_MEMORY, 0);
+	public OffHeapSerializer(final Class<T> baseClass) {
+		this(baseClass, (new ConfigFactory()).withDefaults().build(), 0);
 	}
 
-	public OffHeapSerializer(final Class<T> baseClass, final long size, final SizeType sizeType, final MemoryLocation location, final long metadataSize) {
+	public OffHeapSerializer(final Class<T> baseClass, final OHSConfig config, final long metadataSize) {
 		super();
+		final long size = config.getSize();
 		assert (size > 0);
 		this.baseClass = baseClass;
 		this.firstFieldOffset = UnsafeHelper.firstFieldOffset(baseClass);
@@ -53,7 +54,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 		this.metadataSize = METADATA_STATUS_SIZE + metadataSize;
 		this.nodeSize = this.elementSize + this.metadataSize;
 
-		switch (sizeType) {
+		switch (config.getSizeType()) {
 		case BYTES:
 			this.memorySize = size;
 			this.maxElementCount = size / this.nodeSize;
@@ -65,7 +66,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 			break;
 		}
 
-		switch (location) {
+		switch (config.getLocation()) {
 		case NATIVE_MEMORY:
 		default:
 			this.address = getUnsafe().allocateMemory(this.memorySize);
