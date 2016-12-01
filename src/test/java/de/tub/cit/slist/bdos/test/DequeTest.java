@@ -14,8 +14,8 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import de.tub.cit.slist.bdos.BigDataLinkedList;
-import de.tub.cit.slist.bdos.OffHeapSerializer.MemoryLocation;
-import de.tub.cit.slist.bdos.OffHeapSerializer.SizeType;
+import de.tub.cit.slist.bdos.conf.MemoryLocation;
+import de.tub.cit.slist.bdos.conf.SizeType;
 import de.tub.cit.slist.bdos.test.classes.PrimitiveClass;
 
 public class DequeTest {

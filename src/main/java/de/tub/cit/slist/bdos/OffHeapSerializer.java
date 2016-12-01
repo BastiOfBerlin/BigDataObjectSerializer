@@ -3,6 +3,8 @@ package de.tub.cit.slist.bdos;
 import java.io.Serializable;
 import java.lang.reflect.UndeclaredThrowableException;
 
+import de.tub.cit.slist.bdos.conf.MemoryLocation;
+import de.tub.cit.slist.bdos.conf.SizeType;
 import de.tub.cit.slist.bdos.util.UnsafeHelper;
 import sun.misc.Unsafe;
 
@@ -37,20 +39,6 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	private final long		nodeSize;
 	/** class to be saved */
 	private final Class<T>	baseClass;
-
-	/**
-	 * Size unit
-	 */
-	public enum SizeType {
-		BYTES, ELEMENTS
-	}
-
-	/**
-	 * Defines where the data are stored
-	 */
-	public enum MemoryLocation {
-		NATIVE_MEMORY, BYTE_ARRAY
-	}
 
 	public OffHeapSerializer(final Class<T> baseClass, final long size) {
 		this(baseClass, size, SizeType.ELEMENTS, MemoryLocation.NATIVE_MEMORY, 0);

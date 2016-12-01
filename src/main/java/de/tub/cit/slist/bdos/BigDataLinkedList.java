@@ -13,8 +13,8 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.function.Consumer;
 
-import de.tub.cit.slist.bdos.OffHeapSerializer.MemoryLocation;
-import de.tub.cit.slist.bdos.OffHeapSerializer.SizeType;
+import de.tub.cit.slist.bdos.conf.MemoryLocation;
+import de.tub.cit.slist.bdos.conf.SizeType;
 import de.tub.cit.slist.bdos.util.BigDataCollectionHelper;
 import de.tub.cit.slist.bdos.util.UnsafeHelper;
 

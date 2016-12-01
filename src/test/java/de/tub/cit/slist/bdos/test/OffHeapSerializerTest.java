@@ -7,8 +7,8 @@ import org.junit.Ignore;
 import org.junit.Test;
 
 import de.tub.cit.slist.bdos.OffHeapSerializer;
-import de.tub.cit.slist.bdos.OffHeapSerializer.MemoryLocation;
-import de.tub.cit.slist.bdos.OffHeapSerializer.SizeType;
+import de.tub.cit.slist.bdos.conf.MemoryLocation;
+import de.tub.cit.slist.bdos.conf.SizeType;
 import de.tub.cit.slist.bdos.test.classes.PrimitiveClass;
 import de.tub.cit.slist.bdos.util.UnsafeHelper;
 
