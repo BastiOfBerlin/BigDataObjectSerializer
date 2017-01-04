@@ -7,6 +7,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 
+/**
+ * Configuration class for the Off-Heap Serializer. Instances can be obtained by using the {@link ConfigFactory}.
+ */
 public class OHSConfig implements java.io.Serializable {
 
 	private static final long	serialVersionUID	= -5759600872480745404L;
@@ -26,25 +29,44 @@ public class OHSConfig implements java.io.Serializable {
 
 	private final Properties properties;
 
+	/**
+	 * Constructor loading the coded {@link #defaults} as last fallback.
+	 */
 	OHSConfig() {
 		properties = new Properties(defaults);
 		// loadDefaultsFromFile();
 	}
 
-	void loadDefaultsFromFile() {
+	/**
+	 * loads properties from file using default resource name {@value #RESOURCE_NAME}
+	 */
+	void loadPropertiesFromFile() {
 		try {
-			loadDefaultsFromStream(this.getClass().getClassLoader().getResourceAsStream(RESOURCE_NAME));
+			loadPropertiesFromStream(this.getClass().getClassLoader().getResourceAsStream(RESOURCE_NAME));
 		} catch (final IOException e) {
 			// TODO log exception
 			e.printStackTrace();
 		}
 	}
 
-	void loadDefaultsFromFile(final File f) throws FileNotFoundException, IOException {
-		loadDefaultsFromStream(new FileInputStream(f));
+	/**
+	 * loads properties from a file f.
+	 *
+	 * @param f {@link File}
+	 * @throws FileNotFoundException
+	 * @throws IOException
+	 */
+	void loadPropertiesFromFile(final File f) throws FileNotFoundException, IOException {
+		loadPropertiesFromStream(new FileInputStream(f));
 	}
 
-	void loadDefaultsFromStream(final InputStream inputStream) throws IOException {
+	/**
+	 * loads properties from an InputStream.
+	 *
+	 * @param inputStream {@link InputStream}
+	 * @throws IOException
+	 */
+	void loadPropertiesFromStream(final InputStream inputStream) throws IOException {
 		try (InputStream stream = inputStream) {
 			if (stream == null) throw new FileNotFoundException("InputStream is NULL.");
 			properties.load(stream);
@@ -52,6 +74,10 @@ public class OHSConfig implements java.io.Serializable {
 		}
 	}
 
+	/**
+	 * Validates the properties by checking for valid enum constants and number formats. Throws an {@link IllegalArgumentException} if any property is found
+	 * invalid.
+	 */
 	private void validateProperties() {
 		final StringBuilder builder = new StringBuilder();
 		try {
