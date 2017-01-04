@@ -13,7 +13,9 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.function.Consumer;
 
+import de.tub.cit.slist.bdos.conf.ConfigFactory;
 import de.tub.cit.slist.bdos.conf.OHSConfig;
+import de.tub.cit.slist.bdos.conf.SizeType;
 import de.tub.cit.slist.bdos.util.BigDataCollectionHelper;
 import de.tub.cit.slist.bdos.util.UnsafeHelper;
 
@@ -38,9 +40,74 @@ public class BigDataLinkedList<T extends Serializable> extends AbstractSequentia
 	/** index offset to last element */
 	private int last = -1;
 
+	/**
+	 * Creates a new linked list with default configuration.
+	 *
+	 * @param baseClass
+	 *
+	 * @see ConfigFactory#withDefaults()
+	 */
+	public BigDataLinkedList(final Class<T> baseClass) {
+		this(baseClass, null, null);
+	}
+
+	/**
+	 * Creates a new linked list with the given configuration.
+	 *
+	 * @param baseClass
+	 * @param config {@link OHSConfig}
+	 *
+	 * @see ConfigFactory
+	 */
 	public BigDataLinkedList(final Class<T> baseClass, final OHSConfig config) {
+		this(baseClass, config, null);
+	}
+
+	/**
+	 * Creates a new linked list with default configuration and adds all elements from c if not null.<br />
+	 * If c contains more elements than the defaults provide, size is set to <code>c.size()</code>.
+	 *
+	 * @param baseClass
+	 * @param c Collection&lt;T&gt;
+	 *
+	 * @see ConfigFactory#withDefaults()
+	 * @see #addAll(Collection)
+	 */
+	public BigDataLinkedList(final Class<T> baseClass, final Collection<T> c) {
+		final ConfigFactory f = (new ConfigFactory()).withDefaults();
+		final OHSConfig config = f.build();
+		// try to avoid out of bounds exceptions
+		if (config.getSizeType() == SizeType.ELEMENTS && config.getSize() < c.size()) {
+			f.withSize(c.size());
+		}
 		this.baseClass = baseClass;
 		serializer = new OffHeapSerializer<>(baseClass, config, METADATA_BYTES);
+		if (c != null) {
+			this.addAll(c);
+		}
+	}
+
+	/**
+	 * Creates a new linked list with a configuration and adds all elements from c if not null.<br />
+	 * <strong>Note:</strong> It must be ensured that <code>config</code> declares enough size to hold all elements from c, otherwise an exception is thrown.
+	 *
+	 * @param baseClass
+	 * @param config {@link OHSConfig}, defaults to default settings if null
+	 * @param c Collection&lt;T&gt;
+	 *
+	 * @see ConfigFactory#withDefaults()
+	 * @see #addAll(Collection)
+	 */
+	public BigDataLinkedList(final Class<T> baseClass, final OHSConfig config, final Collection<T> c) {
+		OHSConfig conf = config;
+		if (conf == null) {
+			conf = (new ConfigFactory()).withDefaults().build();
+		}
+		this.baseClass = baseClass;
+		serializer = new OffHeapSerializer<>(baseClass, conf, METADATA_BYTES);
+		if (c != null) {
+			this.addAll(c);
+		}
 	}
 
 	private int getNextPointer(final int idx) {
