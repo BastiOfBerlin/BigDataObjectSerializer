@@ -46,6 +46,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 
 	public OffHeapSerializer(final Class<T> baseClass, final OHSConfig config, final long metadataSize) {
 		super();
+		assert (config != null);
 		final long size = config.getSize();
 		assert (size > 0);
 		this.baseClass = baseClass;
