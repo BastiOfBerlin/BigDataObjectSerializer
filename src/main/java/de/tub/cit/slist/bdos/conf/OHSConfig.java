@@ -115,4 +115,29 @@ public class OHSConfig implements java.io.Serializable {
 		return MemoryLocation.valueOf(properties.getProperty(PROP_LOCATION));
 	}
 
+	@Override
+	public String toString() {
+		return "OHSConfig [size=" + getSize() + ", sizeType=" + getSizeType() + ", location=" + getLocation() + "]";
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + ((properties == null) ? 0 : properties.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(final Object obj) {
+		if (this == obj) return true;
+		if (obj == null) return false;
+		if (getClass() != obj.getClass()) return false;
+		final OHSConfig other = (OHSConfig) obj;
+		if (properties == null) {
+			if (other.properties != null) return false;
+		} else if (!properties.equals(other.properties)) return false;
+		return true;
+	}
+
 }
