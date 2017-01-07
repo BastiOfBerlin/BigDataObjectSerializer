@@ -5,6 +5,7 @@ import java.lang.reflect.Modifier;
 
 import sun.misc.Unsafe;
 
+@SuppressWarnings("restriction")
 public class UnsafeHelper {
 	public static final int	OBJECT_SHELL_SIZE	= 8;
 	public static final int	OBJREF_SIZE			= 4;

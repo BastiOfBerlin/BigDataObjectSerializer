@@ -8,6 +8,7 @@ import de.tub.cit.slist.bdos.conf.OHSConfig;
 import de.tub.cit.slist.bdos.util.UnsafeHelper;
 import sun.misc.Unsafe;
 
+@SuppressWarnings("restriction")
 public class OffHeapSerializer<T extends Serializable> implements Serializable {
 
 	private static final long	serialVersionUID		= -6348155422688768649L;

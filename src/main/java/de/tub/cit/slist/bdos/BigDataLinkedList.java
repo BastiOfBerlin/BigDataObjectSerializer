@@ -450,7 +450,7 @@ public class BigDataLinkedList<T extends Serializable> extends AbstractSequentia
 	@Override
 	public boolean remove(final Object o) {
 		try {
-			@SuppressWarnings("unchecked")
+			@SuppressWarnings({ "unchecked", "restriction" })
 			final T compare = (T) UnsafeHelper.getUnsafe().allocateInstance(baseClass);
 			if (o == null) {
 				for (int x = first; x != -1; x = getNextPointer(x)) {
@@ -588,7 +588,7 @@ public class BigDataLinkedList<T extends Serializable> extends AbstractSequentia
 	@Override
 	public boolean removeLastOccurrence(final Object o) {
 		try {
-			@SuppressWarnings("unchecked")
+			@SuppressWarnings({ "unchecked", "restriction" })
 			final T compare = (T) UnsafeHelper.getUnsafe().allocateInstance(baseClass);
 			if (o == null) {
 				for (int x = last; x != -1; x = getPrevPointer(x)) {
@@ -677,7 +677,7 @@ public class BigDataLinkedList<T extends Serializable> extends AbstractSequentia
 	@Override
 	public int indexOf(final Object o) {
 		try {
-			@SuppressWarnings("unchecked")
+			@SuppressWarnings({ "unchecked", "restriction" })
 			final T compare = (T) UnsafeHelper.getUnsafe().allocateInstance(baseClass);
 			int index = 0;
 			if (o == null) {
@@ -705,7 +705,7 @@ public class BigDataLinkedList<T extends Serializable> extends AbstractSequentia
 	@Override
 	public int lastIndexOf(final Object o) {
 		try {
-			@SuppressWarnings("unchecked")
+			@SuppressWarnings({ "unchecked", "restriction" })
 			final T compare = (T) UnsafeHelper.getUnsafe().allocateInstance(baseClass);
 			int index = size;
 			if (o == null) {
