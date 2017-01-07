@@ -1,10 +1,20 @@
 package de.tub.cit.slist.bdos;
 
 import java.io.Serializable;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.UndeclaredThrowableException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import de.tub.cit.slist.bdos.conf.ConfigFactory;
 import de.tub.cit.slist.bdos.conf.OHSConfig;
+import de.tub.cit.slist.bdos.metadata.ClassMetadata;
+import de.tub.cit.slist.bdos.metadata.FieldMetadata;
+import de.tub.cit.slist.bdos.metadata.FieldType;
 import de.tub.cit.slist.bdos.util.UnsafeHelper;
 import sun.misc.Unsafe;
 
@@ -23,23 +33,25 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	public static final byte	RESERVED_FLAGS	= 0b00000111;
 
 	/** start address of allocated memory */
-	private final long		address;
+	private final long							address;
 	/** overall size of allocated memory */
-	private final long		memorySize;
+	private final long							memorySize;
 	/** max number of elements */
-	private final long		maxElementCount;
+	private final long							maxElementCount;
 	/** optional byte array, can be used instead of native (off-heap) memory */
-	private byte[]			backingArray	= null;
+	private byte[]								backingArray	= null;
 	/** offset of first field within object */
-	private final long		firstFieldOffset;
+	private final long							firstFieldOffset;
 	/** data size per element; <=> size of object excluding headers */
-	private final long		elementSize;
+	private final long							elementSize;
 	/** size of metadata */
-	private final long		metadataSize;
+	private final long							metadataSize;
 	/** size of element and meta data */
-	private final long		nodeSize;
+	private final long							nodeSize;
+	/** metadata of persisted classes */
+	private final Map<Class<?>, ClassMetadata>	classMetadata	= new HashMap<>();
 	/** class to be saved */
-	private final Class<T>	baseClass;
+	private final Class<T>						baseClass;
 
 	public OffHeapSerializer(final Class<T> baseClass) {
 		this(baseClass, (new ConfigFactory()).withDefaults().build(), 0);
@@ -51,8 +63,12 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 		final long size = config.getSize();
 		assert (size > 0);
 		this.baseClass = baseClass;
+
+		acquireClassMetadata(baseClass);
+
 		this.firstFieldOffset = UnsafeHelper.firstFieldOffset(baseClass);
-		this.elementSize = UnsafeHelper.sizeOf(baseClass) - this.firstFieldOffset;
+		// this.elementSize = UnsafeHelper.sizeOf(baseClass) - this.firstFieldOffset;
+		this.elementSize = classMetadata.get(baseClass).getLength();
 		this.metadataSize = METADATA_STATUS_SIZE + metadataSize;
 		this.nodeSize = this.elementSize + this.metadataSize;
 
@@ -83,11 +99,121 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 		}
 	}
 
+	/**
+	 * get metadata for <code>baseclazz</code> and store it in {@link #classMetadata}
+	 *
+	 * @param baseclazz
+	 */
+	private void acquireClassMetadata(final Class<?> baseclazz) {
+		if (classMetadata.containsKey(baseclazz)) return;
+
+		Class<?> clazz = baseclazz;
+		final List<FieldMetadata> fields = new ArrayList<>();
+		long fieldLength, totalLength = 0;
+		do {
+			for (final Field f : clazz.getDeclaredFields()) {
+				if (!Modifier.isStatic(f.getModifiers())) {
+					final Class<?> classType = f.getType();
+					final FieldMetadata fieldMetadata = new FieldMetadata();
+					fieldMetadata.setFieldName(f.getName());
+					fieldMetadata.setOffset(getUnsafe().objectFieldOffset(f));
+					fieldMetadata.setClazz(classType);
+
+					if (classType == boolean.class) {
+						fieldMetadata.setType(FieldType.BOOL);
+						fieldLength = 1;
+					} else if (classType == byte.class) {
+						fieldMetadata.setType(FieldType.BYTE);
+						fieldLength = 1;
+					} else if (classType == char.class) {
+						fieldMetadata.setType(FieldType.CHAR);
+						fieldLength = 2;
+					} else if (classType == double.class) {
+						fieldMetadata.setType(FieldType.DOUBLE);
+						fieldLength = 8;
+					} else if (classType == float.class) {
+						fieldMetadata.setType(FieldType.FLOAT);
+						fieldLength = 4;
+					} else if (classType == int.class) {
+						fieldMetadata.setType(FieldType.INT);
+						fieldLength = 4;
+					} else if (classType == long.class) {
+						fieldMetadata.setType(FieldType.LONG);
+						fieldLength = 8;
+					} else if (classType == short.class) {
+						fieldMetadata.setType(FieldType.SHORT);
+						fieldLength = 2;
+					} else
+						throw new UnsupportedOperationException();
+
+					totalLength += fieldLength;
+					fieldMetadata.setLength(fieldLength);
+					fields.add(fieldMetadata);
+				}
+			}
+		} while ((clazz = clazz.getSuperclass()) != null);
+		Collections.sort(fields); // order by offset
+		final ClassMetadata classMeta = new ClassMetadata(totalLength, fields.toArray(new FieldMetadata[fields.size()]));
+		classMeta.calcSerializedOffsets();
+		classMetadata.put(baseclazz, classMeta);
+	}
+
 	public void clear() {
 		if (backingArray != null) {
 			java.util.Arrays.fill(backingArray, (byte) 0);
 		} else {
 			getUnsafe().setMemory(address, this.memorySize, (byte) 0);
+		}
+	}
+
+	private void copyObject(final Class<?> baseclass, final Direction direction, final Object src, final long srcOffset, final Object dest,
+			final long destOffset) {
+		final ClassMetadata classMetadata = this.classMetadata.get(baseclass);
+		long sOff, dOff;
+		for (final FieldMetadata field : classMetadata.getFields()) {
+			if (direction == Direction.SERIALIZE) {
+				sOff = srcOffset + field.getOffset();
+				dOff = destOffset + field.getSerializedOffset();
+			} else {
+				sOff = srcOffset + field.getSerializedOffset();
+				dOff = destOffset + field.getOffset();
+			}
+			switch (field.getType()) {
+			case BOOL:
+				getUnsafe().putBoolean(dest, dOff, getUnsafe().getBoolean(src, sOff));
+				break;
+			case BYTE:
+				getUnsafe().putByte(dest, dOff, getUnsafe().getByte(src, sOff));
+				break;
+			case CHAR:
+				getUnsafe().putChar(dest, dOff, getUnsafe().getChar(src, sOff));
+				break;
+			case DOUBLE:
+				getUnsafe().putDouble(dest, dOff, getUnsafe().getDouble(src, sOff));
+				break;
+			case FLOAT:
+				getUnsafe().putFloat(dest, dOff, getUnsafe().getFloat(src, sOff));
+				break;
+			case INT:
+				getUnsafe().putInt(dest, dOff, getUnsafe().getInt(src, sOff));
+				break;
+			case LONG:
+				getUnsafe().putLong(dest, dOff, getUnsafe().getLong(src, sOff));
+				break;
+			case SHORT:
+				getUnsafe().putShort(dest, dOff, getUnsafe().getShort(src, sOff));
+				break;
+			case ARRAY:
+			case ARRAY_CONST:
+			case STRING:
+			case STRING_CONST:
+			case COLLECTION:
+			case COLLECTION_CONST:
+			case OBJECT:
+			default:
+				throw new UnsupportedOperationException();
+
+			}
 		}
 	}
 
@@ -101,7 +227,8 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	public void setRandomAccess(final long idx, final T element) {
 		checkIndexBounds(idx);
 		if (element != null) {
-			getUnsafe().copyMemory(element, firstFieldOffset, backingArray, offset(idx), elementSize);
+			// getUnsafe().copyMemory(element, firstFieldOffset, backingArray, offset(idx), elementSize);
+			copyObject(baseClass, Direction.SERIALIZE, element, 0, backingArray, offset(idx));
 			setNull(idx, false);
 		} else {
 			getUnsafe().setMemory(offset(idx), elementSize, (byte) 0);
@@ -140,7 +267,8 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	public T getRandomAccess(final T dest, final long idx) {
 		checkIndexBounds(idx);
 		if (isNull(idx)) return null;
-		UnsafeHelper.copyMemory(backingArray, offset(idx), dest, firstFieldOffset, elementSize);
+		// UnsafeHelper.copyMemory(backingArray, offset(idx), dest, firstFieldOffset, elementSize);
+		copyObject(baseClass, Direction.DESERIALIZE, backingArray, offset(idx), dest, 0);
 		return dest;
 	}
 
@@ -367,6 +495,10 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	protected void finalize() throws Throwable {
 		destroy();
 		super.finalize();
+	}
+
+	private enum Direction {
+		SERIALIZE, DESERIALIZE
 	}
 
 }
