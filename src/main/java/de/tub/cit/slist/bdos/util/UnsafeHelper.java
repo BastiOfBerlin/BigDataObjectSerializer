@@ -1,7 +1,9 @@
 package de.tub.cit.slist.bdos.util;
 
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.UndeclaredThrowableException;
 
 import sun.misc.Unsafe;
 
@@ -223,12 +225,74 @@ public class UnsafeHelper {
 	public static byte[] toByteArray(final Object obj) {
 		final int len = (int) sizeOf(obj.getClass());
 		final byte[] bytes = new byte[len];
-		unsafe.copyMemory(obj, 0, bytes, Unsafe.ARRAY_BYTE_BASE_OFFSET, bytes.length);
+		getUnsafe().copyMemory(obj, 0, bytes, Unsafe.ARRAY_BYTE_BASE_OFFSET, bytes.length);
 		return bytes;
 	}
 
 	private static long normalize(final int value) {
 		if (value >= 0) return value;
 		return (~0L >>> 32) & value;
+	}
+
+	/**
+	 * Serializes a String to a fixed-length, UTF-8 encoded byte[].<br />
+	 * Because of the conversion, take into account that one character might be equivalent to two bytes!
+	 *
+	 * @param dest
+	 * @param destOffset
+	 * @param s
+	 * @param length
+	 * @return <code>true</code> iff <code>s</code> has been cut to fit.
+	 *
+	 * @see {@link Unsafe#putInt(Object, long, int)}
+	 */
+	public static boolean serializeString(final Object dest, final long destOffset, final String s, final int length) {
+		if (s == null) {
+			// pad with NULs and return instead of creating a new instance
+			getUnsafe().setMemory(dest, destOffset, length, (byte) 0);
+			return false;
+		}
+		try {
+			final byte[] bytes = s.getBytes("UTF-8");
+			final boolean cut = bytes.length > length;
+			// if UTF-8 codepoints occupy 2 bytes, then don't copy half of a codepoint but discard it
+			final int trailingEncodingWaste = cut && bytes.length > s.length() ? 1 : 0;
+			// copy bytes, but not more than length
+			final int bytesToCopy = Math.min(bytes.length, length) - trailingEncodingWaste;
+			getUnsafe().copyMemory(bytes, Unsafe.ARRAY_BYTE_BASE_OFFSET, dest, destOffset, bytesToCopy);
+			if (bytesToCopy < length) {
+				// pad with NULs
+				getUnsafe().setMemory(dest, destOffset + bytesToCopy, length - bytesToCopy, (byte) 0);
+			}
+			return cut;
+		} catch (final UnsupportedEncodingException e) {
+			throw new UndeclaredThrowableException(e);
+		}
+	}
+
+	/**
+	 * Deserializes a byte[] of a given <code>length</code> to String, NUL characters at the end are omitted.
+	 *
+	 * @param src
+	 * @param srcOffset
+	 * @param length
+	 * @return {@link String} with actual length
+	 *
+	 * @see {@link Unsafe#getInt(Object, long)}
+	 */
+	public static String deserializeString(final Object src, final long srcOffset, int length) {
+		int lastCharOffset = length - 1;
+		// trim trailing NUL characters -> get actual length
+		while (lastCharOffset >= 0 && getUnsafe().getByte(src, srcOffset + lastCharOffset) == (byte) 0) {
+			lastCharOffset--;
+		}
+		length = lastCharOffset + 1;
+		final byte[] dest = new byte[length];
+		getUnsafe().copyMemory(src, srcOffset, dest, Unsafe.ARRAY_BYTE_BASE_OFFSET, length);
+		try {
+			return new String(dest, "UTF-8");
+		} catch (final UnsupportedEncodingException e) {
+			throw new UndeclaredThrowableException(e);
+		}
 	}
 }
