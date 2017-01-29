@@ -4,6 +4,8 @@ import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.UndeclaredThrowableException;
+import java.util.HashMap;
+import java.util.Map;
 
 import sun.misc.Unsafe;
 
@@ -19,6 +21,18 @@ public class UnsafeHelper {
 	public static final int	BOOLEAN_FIELD_SIZE	= 1;
 	public static final int	DOUBLE_FIELD_SIZE	= 8;
 	public static final int	FLOAT_FIELD_SIZE	= 4;
+
+	public static final Map<Class<?>, Integer> PRIMITIVE_LENGTHS = new HashMap<>();
+	static {
+		PRIMITIVE_LENGTHS.put(Boolean.TYPE, BOOLEAN_FIELD_SIZE);
+		PRIMITIVE_LENGTHS.put(Byte.TYPE, Byte.BYTES);
+		PRIMITIVE_LENGTHS.put(Character.TYPE, Character.BYTES);
+		PRIMITIVE_LENGTHS.put(Double.TYPE, Double.BYTES);
+		PRIMITIVE_LENGTHS.put(Float.TYPE, Float.BYTES);
+		PRIMITIVE_LENGTHS.put(Integer.TYPE, Integer.BYTES);
+		PRIMITIVE_LENGTHS.put(Long.TYPE, Long.BYTES);
+		PRIMITIVE_LENGTHS.put(Short.TYPE, Short.BYTES);
+	}
 
 	/** the unsafe */
 	private static Unsafe unsafe;
@@ -57,8 +71,8 @@ public class UnsafeHelper {
 	 */
 	public static long toAddress(final Object obj) {
 		final Object[] array = new Object[] { obj };
-		final long baseOffset = getUnsafe().arrayBaseOffset(Object[].class);
-		return normalize(getUnsafe().getInt(array, baseOffset));
+		// return normalize(getUnsafe().getInt(array, (long) Unsafe.ARRAY_OBJECT_BASE_OFFSET));
+		return getUnsafe().getLong(array, (long) Unsafe.ARRAY_OBJECT_BASE_OFFSET);
 	}
 
 	/**
@@ -69,8 +83,7 @@ public class UnsafeHelper {
 	 */
 	public static Object fromAddress(final long address) {
 		final Object[] array = new Object[] { null };
-		final long baseOffset = getUnsafe().arrayBaseOffset(Object[].class);
-		getUnsafe().putLong(array, baseOffset, address);
+		getUnsafe().putLong(array, (long) Unsafe.ARRAY_OBJECT_BASE_OFFSET, address);
 		return array[0];
 	}
 
