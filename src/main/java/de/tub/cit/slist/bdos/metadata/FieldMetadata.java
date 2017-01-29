@@ -7,6 +7,8 @@ public class FieldMetadata implements Comparable<FieldMetadata> {
 	/** offset in serialized form */
 	private long		serializedOffset;
 	private long		length;
+	/** number of elements */
+	private int			elements;
 	private FieldType	type;
 	/** not-null only for arrays, collections and objects */
 	private Class<?>	clazz;
@@ -15,12 +17,13 @@ public class FieldMetadata implements Comparable<FieldMetadata> {
 
 	};
 
-	public FieldMetadata(final String fieldName, final long offset, final long serializedOffset, final long length, final FieldType type,
+	public FieldMetadata(final String fieldName, final long offset, final long serializedOffset, final long length, final int elements, final FieldType type,
 			final Class<?> clazz) {
 		super();
 		this.fieldName = fieldName;
 		this.offset = offset;
 		this.serializedOffset = serializedOffset;
+		this.elements = elements;
 		this.length = length;
 		this.type = type;
 		this.clazz = clazz;
@@ -56,6 +59,14 @@ public class FieldMetadata implements Comparable<FieldMetadata> {
 
 	public void setLength(final long length) {
 		this.length = length;
+	}
+
+	public int getElements() {
+		return elements;
+	}
+
+	public void setElements(final int elements) {
+		this.elements = elements;
 	}
 
 	public FieldType getType() {
