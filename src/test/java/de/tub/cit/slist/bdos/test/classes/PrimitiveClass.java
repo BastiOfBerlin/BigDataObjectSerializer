@@ -2,7 +2,7 @@ package de.tub.cit.slist.bdos.test.classes;
 
 import java.util.Random;
 
-public class PrimitiveClass implements java.io.Serializable {
+public class PrimitiveClass implements RandomlyInitializable, java.io.Serializable {
 	private static final long serialVersionUID = 1283749023269275762L;
 
 	private boolean	bool;	// 1
@@ -20,16 +20,7 @@ public class PrimitiveClass implements java.io.Serializable {
 
 	public PrimitiveClass(final Random r) {
 		super();
-		this.bool = r.nextBoolean();
-		final byte[] bytes = new byte[1];
-		r.nextBytes(bytes);
-		this.b = bytes[0];
-		this.c = (char) (r.nextInt(26) + 'a');
-		this.d = r.nextDouble();
-		this.f = r.nextFloat();
-		this.i = r.nextInt();
-		this.l = r.nextLong();
-		this.s = (short) r.nextInt(Short.MAX_VALUE + 1);
+		randomInit(r);
 	}
 
 	public PrimitiveClass(final boolean bool, final byte b, final char c, final double d, final float f, final int i, final long l, final short s) {
@@ -42,6 +33,20 @@ public class PrimitiveClass implements java.io.Serializable {
 		this.i = i;
 		this.l = l;
 		this.s = s;
+	}
+
+	@Override
+	public void randomInit(final Random r) {
+		this.bool = r.nextBoolean();
+		final byte[] bytes = new byte[1];
+		r.nextBytes(bytes);
+		this.b = bytes[0];
+		this.c = (char) (r.nextInt(26) + 'a');
+		this.d = r.nextDouble();
+		this.f = r.nextFloat();
+		this.i = r.nextInt();
+		this.l = r.nextLong();
+		this.s = (short) r.nextInt(Short.MAX_VALUE + 1);
 	}
 
 	public boolean isBool() {
