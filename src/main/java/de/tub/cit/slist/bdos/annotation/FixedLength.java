@@ -23,5 +23,5 @@ import java.lang.annotation.Target;
 @Target(FIELD)
 public @interface FixedLength {
 	/** number of elements to be stored */
-	long value();
+	int value();
 }
