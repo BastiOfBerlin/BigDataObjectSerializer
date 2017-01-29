@@ -1,6 +1,7 @@
 package de.tub.cit.slist.bdos;
 
 import java.io.Serializable;
+import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.UndeclaredThrowableException;
@@ -10,6 +11,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import de.tub.cit.slist.bdos.annotation.FixedLength;
 import de.tub.cit.slist.bdos.conf.ConfigFactory;
 import de.tub.cit.slist.bdos.conf.OHSConfig;
 import de.tub.cit.slist.bdos.metadata.ClassMetadata;
@@ -53,17 +55,40 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	/** class to be saved */
 	private final Class<T>						baseClass;
 
+	private static final Map<Class<?>, ClassMetadata> wrapperAndPrimitivesMetadata;
+	static {
+		wrapperAndPrimitivesMetadata = new HashMap<>();
+		acquireClassMetadata(Boolean.class, wrapperAndPrimitivesMetadata);
+		acquireClassMetadata(Byte.class, wrapperAndPrimitivesMetadata);
+		acquireClassMetadata(Character.class, wrapperAndPrimitivesMetadata);
+		acquireClassMetadata(Double.class, wrapperAndPrimitivesMetadata);
+		acquireClassMetadata(Float.class, wrapperAndPrimitivesMetadata);
+		acquireClassMetadata(Integer.class, wrapperAndPrimitivesMetadata);
+		acquireClassMetadata(Long.class, wrapperAndPrimitivesMetadata);
+		acquireClassMetadata(Short.class, wrapperAndPrimitivesMetadata);
+		acquireClassMetadata(Boolean.TYPE, wrapperAndPrimitivesMetadata);
+		acquireClassMetadata(Byte.TYPE, wrapperAndPrimitivesMetadata);
+		acquireClassMetadata(Character.TYPE, wrapperAndPrimitivesMetadata);
+		acquireClassMetadata(Double.TYPE, wrapperAndPrimitivesMetadata);
+		acquireClassMetadata(Float.TYPE, wrapperAndPrimitivesMetadata);
+		acquireClassMetadata(Integer.TYPE, wrapperAndPrimitivesMetadata);
+		acquireClassMetadata(Long.TYPE, wrapperAndPrimitivesMetadata);
+		acquireClassMetadata(Short.TYPE, wrapperAndPrimitivesMetadata);
+	}
+
 	public OffHeapSerializer(final Class<T> baseClass) {
 		this(baseClass, (new ConfigFactory()).withDefaults().build(), 0);
 	}
 
 	public OffHeapSerializer(final Class<T> baseClass, final OHSConfig config, final long metadataSize) {
 		super();
+		assert (Unsafe.ADDRESS_SIZE == UnsafeHelper.LONG_FIELD_SIZE);
 		assert (config != null);
 		final long size = config.getSize();
 		assert (size > 0);
 		this.baseClass = baseClass;
 
+		classMetadata.putAll(wrapperAndPrimitivesMetadata);
 		acquireClassMetadata(baseClass);
 
 		this.firstFieldOffset = UnsafeHelper.firstFieldOffset(baseClass);
@@ -103,61 +128,105 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	 * get metadata for <code>baseclazz</code> and store it in {@link #classMetadata}
 	 *
 	 * @param baseclazz
+	 * @return added class metadata
 	 */
-	private void acquireClassMetadata(final Class<?> baseclazz) {
-		if (classMetadata.containsKey(baseclazz)) return;
+	private Map<Class<?>, ClassMetadata> acquireClassMetadata(final Class<?> baseclazz) {
+		return acquireClassMetadata(baseclazz, classMetadata);
+	}
+
+	/**
+	 * get metadata for <code>baseclazz</code> and store it in <code>target</code>
+	 *
+	 * @param baseclazz
+	 * @param target
+	 * @return added class metadata
+	 */
+	private static Map<Class<?>, ClassMetadata> acquireClassMetadata(final Class<?> baseclazz, final Map<Class<?>, ClassMetadata> target) {
+		final Map<Class<?>, ClassMetadata> addedClasses = new HashMap<>();
+		if (target.containsKey(baseclazz)) return addedClasses;
 
 		Class<?> clazz = baseclazz;
 		final List<FieldMetadata> fields = new ArrayList<>();
 		long fieldLength, totalLength = 0;
-		do {
-			for (final Field f : clazz.getDeclaredFields()) {
-				if (!Modifier.isStatic(f.getModifiers())) {
-					final Class<?> classType = f.getType();
-					final FieldMetadata fieldMetadata = new FieldMetadata();
-					fieldMetadata.setFieldName(f.getName());
-					fieldMetadata.setOffset(getUnsafe().objectFieldOffset(f));
-					fieldMetadata.setClazz(classType);
+		if (clazz.isPrimitive()) {
+			totalLength = UnsafeHelper.PRIMITIVE_LENGTHS.get(clazz);
+		} else {
+			do {
+				for (final Field f : clazz.getDeclaredFields()) {
+					if (!Modifier.isStatic(f.getModifiers())) {
+						final Class<?> classType = f.getType();
+						final FieldMetadata fieldMetadata = new FieldMetadata();
+						fieldMetadata.setFieldName(f.getName());
+						fieldMetadata.setOffset(getUnsafe().objectFieldOffset(f));
+						fieldMetadata.setClazz(classType);
 
-					if (classType == boolean.class) {
-						fieldMetadata.setType(FieldType.BOOL);
-						fieldLength = 1;
-					} else if (classType == byte.class) {
-						fieldMetadata.setType(FieldType.BYTE);
-						fieldLength = 1;
-					} else if (classType == char.class) {
-						fieldMetadata.setType(FieldType.CHAR);
-						fieldLength = 2;
-					} else if (classType == double.class) {
-						fieldMetadata.setType(FieldType.DOUBLE);
-						fieldLength = 8;
-					} else if (classType == float.class) {
-						fieldMetadata.setType(FieldType.FLOAT);
-						fieldLength = 4;
-					} else if (classType == int.class) {
-						fieldMetadata.setType(FieldType.INT);
-						fieldLength = 4;
-					} else if (classType == long.class) {
-						fieldMetadata.setType(FieldType.LONG);
-						fieldLength = 8;
-					} else if (classType == short.class) {
-						fieldMetadata.setType(FieldType.SHORT);
-						fieldLength = 2;
-					} else
-						throw new UnsupportedOperationException();
+						if (classType == boolean.class) {
+							fieldMetadata.setType(FieldType.BOOL);
+							fieldLength = UnsafeHelper.BOOLEAN_FIELD_SIZE;
+						} else if (classType == byte.class) {
+							fieldMetadata.setType(FieldType.BYTE);
+							fieldLength = UnsafeHelper.BYTE_FIELD_SIZE;
+						} else if (classType == char.class) {
+							fieldMetadata.setType(FieldType.CHAR);
+							fieldLength = UnsafeHelper.CHAR_FIELD_SIZE;
+						} else if (classType == double.class) {
+							fieldMetadata.setType(FieldType.DOUBLE);
+							fieldLength = UnsafeHelper.DOUBLE_FIELD_SIZE;
+						} else if (classType == float.class) {
+							fieldMetadata.setType(FieldType.FLOAT);
+							fieldLength = UnsafeHelper.FLOAT_FIELD_SIZE;
+						} else if (classType == int.class) {
+							fieldMetadata.setType(FieldType.INT);
+							fieldLength = UnsafeHelper.INT_FIELD_SIZE;
+						} else if (classType == long.class) {
+							fieldMetadata.setType(FieldType.LONG);
+							fieldLength = UnsafeHelper.LONG_FIELD_SIZE;
+						} else if (classType == short.class) {
+							fieldMetadata.setType(FieldType.SHORT);
+							fieldLength = UnsafeHelper.SHORT_FIELD_SIZE;
+						} else if (classType == String.class) {
+							final FixedLength fixedLength = f.getAnnotation(FixedLength.class);
+							if (fixedLength != null) {
+								fieldMetadata.setType(FieldType.STRING_FIXED);
+								fieldLength = fixedLength.value() * UnsafeHelper.CHAR_FIELD_SIZE;
+								fieldMetadata.setElements(fixedLength.value());
+							} else
+								// TODO: variable-length String
+								throw new UnsupportedOperationException();
+						} else if (classType.isArray()) {
+							final FixedLength fixedLength = f.getAnnotation(FixedLength.class);
+							if (fixedLength != null) {
+								fieldMetadata.setType(FieldType.ARRAY_FIXED);
+								final Class<?> subtype = classType.getComponentType();
+								fieldMetadata.setClazz(subtype);
+								fieldMetadata.setElements(fixedLength.value());
+								final Map<Class<?>, ClassMetadata> subtypeMetadata = acquireClassMetadata(subtype, target);
+								fieldLength = fixedLength.value() * target.get(subtype).getLength();
+								addedClasses.putAll(subtypeMetadata);
+							} else
+								// TODO: variable-length Array
+								throw new UnsupportedOperationException();
+						} else
+							throw new UnsupportedOperationException();
 
-					totalLength += fieldLength;
-					fieldMetadata.setLength(fieldLength);
-					fields.add(fieldMetadata);
+						totalLength += fieldLength;
+						fieldMetadata.setLength(fieldLength);
+						fields.add(fieldMetadata);
+					}
 				}
-			}
-		} while ((clazz = clazz.getSuperclass()) != null);
-		Collections.sort(fields); // order by offset
+			} while ((clazz = clazz.getSuperclass()) != null);
+			Collections.sort(fields); // order by offset
+		}
 		final ClassMetadata classMeta = new ClassMetadata(totalLength, fields.toArray(new FieldMetadata[fields.size()]));
 		classMeta.calcSerializedOffsets();
-		classMetadata.put(baseclazz, classMeta);
+		addedClasses.put(baseclazz, classMeta);
+		target.putAll(addedClasses);
+		return addedClasses;
 	}
 
+	/**
+	 * Clears the entire allocated memory by overriding it with NULs.
+	 */
 	public void clear() {
 		if (backingArray != null) {
 			java.util.Arrays.fill(backingArray, (byte) 0);
@@ -167,10 +236,16 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	}
 
 	private void copyObject(final Class<?> baseclass, final Direction direction, final Object src, final long srcOffset, final Object dest,
-			final long destOffset) {
+			final long destOffset) throws InstantiationException {
+		if (baseclass.isPrimitive()) {
+			copyPrimitive(FieldType.fromClass(baseclass), src, srcOffset, dest, destOffset);
+			return;
+		}
+
 		final ClassMetadata classMetadata = this.classMetadata.get(baseclass);
 		long sOff, dOff;
 		for (final FieldMetadata field : classMetadata.getFields()) {
+			// add corresponding field offsets offsets
 			if (direction == Direction.SERIALIZE) {
 				sOff = srcOffset + field.getOffset();
 				dOff = destOffset + field.getSerializedOffset();
@@ -180,40 +255,136 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 			}
 			switch (field.getType()) {
 			case BOOL:
-				getUnsafe().putBoolean(dest, dOff, getUnsafe().getBoolean(src, sOff));
-				break;
 			case BYTE:
-				getUnsafe().putByte(dest, dOff, getUnsafe().getByte(src, sOff));
-				break;
 			case CHAR:
-				getUnsafe().putChar(dest, dOff, getUnsafe().getChar(src, sOff));
-				break;
 			case DOUBLE:
-				getUnsafe().putDouble(dest, dOff, getUnsafe().getDouble(src, sOff));
-				break;
 			case FLOAT:
-				getUnsafe().putFloat(dest, dOff, getUnsafe().getFloat(src, sOff));
-				break;
 			case INT:
-				getUnsafe().putInt(dest, dOff, getUnsafe().getInt(src, sOff));
-				break;
 			case LONG:
-				getUnsafe().putLong(dest, dOff, getUnsafe().getLong(src, sOff));
-				break;
 			case SHORT:
-				getUnsafe().putShort(dest, dOff, getUnsafe().getShort(src, sOff));
+				copyPrimitive(field.getType(), src, sOff, dest, dOff);
+				break;
+			case STRING_FIXED:
+				if (direction == Direction.SERIALIZE) {
+					final String s = (String) getUnsafe().getObject(src, sOff);
+					final char[] arr = new char[Math.min(s.length(), field.getElements())];
+					s.getChars(0, arr.length, arr, 0);
+					for (int i = 0; i < arr.length; i++) {
+						// copyPrimitive(FieldType.CHAR, arr, Unsafe.ARRAY_CHAR_BASE_OFFSET + i * UnsafeHelper.CHAR_FIELD_SIZE, dest,
+						// dOff + i * UnsafeHelper.CHAR_FIELD_SIZE);
+						copyObject(char.class, direction, arr, Unsafe.ARRAY_CHAR_BASE_OFFSET + i * UnsafeHelper.CHAR_FIELD_SIZE, dest,
+								dOff + i * UnsafeHelper.CHAR_FIELD_SIZE);
+					}
+					// pad with NULs
+					if (arr.length < field.getElements()) {
+						getUnsafe().setMemory(dest, dOff + (arr.length * UnsafeHelper.CHAR_FIELD_SIZE),
+								(field.getElements() * UnsafeHelper.CHAR_FIELD_SIZE) - (arr.length * UnsafeHelper.CHAR_FIELD_SIZE), (byte) 0);
+					}
+				} else {
+					final char[] arr = new char[field.getElements()];
+					for (int i = 0; i < arr.length; i++) {
+						if (getUnsafe().getChar(sOff + i * UnsafeHelper.CHAR_FIELD_SIZE) == (byte) 0) {
+							break;
+						}
+						// copyPrimitive(FieldType.CHAR, src, sOff + i * UnsafeHelper.CHAR_FIELD_SIZE, arr,
+						// Unsafe.ARRAY_CHAR_BASE_OFFSET + i * UnsafeHelper.CHAR_FIELD_SIZE);
+						copyObject(char.class, direction, src, sOff + i * UnsafeHelper.CHAR_FIELD_SIZE, arr,
+								Unsafe.ARRAY_CHAR_BASE_OFFSET + i * UnsafeHelper.CHAR_FIELD_SIZE);
+					}
+					getUnsafe().putObject(dest, dOff, String.valueOf(arr));
+				}
+				break;
+			case ARRAY_FIXED:
+				final long subTypeLength = this.classMetadata.get(field.getClazz()).getLength();
+				if (direction == Direction.SERIALIZE) {
+					final Object arr = getUnsafe().getObject(src, sOff);
+					final int arrLength = Array.getLength(arr);
+					for (int i = 0; i < Math.min(arrLength, field.getElements()); i++) {
+						Object copySrc;
+						long copySrcOffset;
+						if (field.getClazz().isPrimitive()) {
+							copySrc = arr;
+							copySrcOffset = Unsafe.ARRAY_OBJECT_BASE_OFFSET + i * UnsafeHelper.PRIMITIVE_LENGTHS.get(field.getClazz());
+						} else {
+							copySrc = Array.get(arr, i);
+							copySrcOffset = 0;
+						}
+						copyObject(field.getClazz(), direction, copySrc, copySrcOffset, dest, dOff + i * subTypeLength);
+					}
+					// pad with NULs
+					if (arrLength < field.getElements()) {
+						getUnsafe().setMemory(dest, dOff + (arrLength * subTypeLength), (field.getElements() * subTypeLength) - (arrLength * subTypeLength),
+								(byte) 0);
+					}
+				} else {
+					final Object arr = Array.newInstance(field.getClazz(), field.getElements());
+					for (int i = 0; i < Array.getLength(arr); i++) {
+						Object copyDest;
+						long copyDestOffset;
+						if (field.getClazz().isPrimitive()) {
+							copyDest = arr;
+							copyDestOffset = Unsafe.ARRAY_OBJECT_BASE_OFFSET + i * UnsafeHelper.PRIMITIVE_LENGTHS.get(field.getClazz());
+						} else {
+							final Object newElement = getUnsafe().allocateInstance(field.getClazz());
+							Array.set(arr, i, newElement);
+							copyDest = newElement;
+							copyDestOffset = 0;
+						}
+						// arr[i]=field.getClazz().newInstance();
+						copyObject(field.getClazz(), direction, src, sOff + i * subTypeLength, copyDest, copyDestOffset);
+					}
+					getUnsafe().putObject(dest, dOff, arr);
+				}
 				break;
 			case ARRAY:
-			case ARRAY_CONST:
 			case STRING:
-			case STRING_CONST:
 			case COLLECTION:
-			case COLLECTION_CONST:
+			case COLLECTION_FIXED:
 			case OBJECT:
 			default:
 				throw new UnsupportedOperationException();
 
 			}
+		}
+	}
+
+	/**
+	 * Copies a primitive of type <code>type</code> from <code>src</code> to <code>dest</code>, using double-register mode.
+	 *
+	 * @param type
+	 * @param src
+	 * @param srcOffset
+	 * @param dest
+	 * @param destOffset
+	 */
+	private void copyPrimitive(final FieldType type, final Object src, final long srcOffset, final Object dest, final long destOffset) {
+		switch (type) {
+		case BOOL:
+			getUnsafe().putBoolean(dest, destOffset, getUnsafe().getBoolean(src, srcOffset));
+			break;
+		case BYTE:
+			getUnsafe().putByte(dest, destOffset, getUnsafe().getByte(src, srcOffset));
+			break;
+		case CHAR:
+			getUnsafe().putChar(dest, destOffset, getUnsafe().getChar(src, srcOffset));
+			break;
+		case DOUBLE:
+			getUnsafe().putDouble(dest, destOffset, getUnsafe().getDouble(src, srcOffset));
+			break;
+		case FLOAT:
+			getUnsafe().putFloat(dest, destOffset, getUnsafe().getFloat(src, srcOffset));
+			break;
+		case INT:
+			getUnsafe().putInt(dest, destOffset, getUnsafe().getInt(src, srcOffset));
+			break;
+		case LONG:
+			getUnsafe().putLong(dest, destOffset, getUnsafe().getLong(src, srcOffset));
+			break;
+		case SHORT:
+			getUnsafe().putShort(dest, destOffset, getUnsafe().getShort(src, srcOffset));
+			break;
+		default:
+			break;
 		}
 	}
 
@@ -228,8 +399,12 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 		checkIndexBounds(idx);
 		if (element != null) {
 			// getUnsafe().copyMemory(element, firstFieldOffset, backingArray, offset(idx), elementSize);
-			copyObject(baseClass, Direction.SERIALIZE, element, 0, backingArray, offset(idx));
-			setNull(idx, false);
+			try {
+				copyObject(baseClass, Direction.SERIALIZE, element, 0, backingArray, offset(idx));
+				setNull(idx, false);
+			} catch (final InstantiationException e) {
+				throw new UndeclaredThrowableException(e);
+			}
 		} else {
 			getUnsafe().setMemory(offset(idx), elementSize, (byte) 0);
 			setNull(idx, true);
@@ -245,7 +420,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	 * @return the element
 	 */
 	public T getRandomAccess(final long idx) {
-		checkIndexBounds(idx);
+		// checkIndexBounds(idx);
 		try {
 			@SuppressWarnings("unchecked")
 			final T obj = (T) getUnsafe().allocateInstance(baseClass);
@@ -268,7 +443,11 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 		checkIndexBounds(idx);
 		if (isNull(idx)) return null;
 		// UnsafeHelper.copyMemory(backingArray, offset(idx), dest, firstFieldOffset, elementSize);
-		copyObject(baseClass, Direction.DESERIALIZE, backingArray, offset(idx), dest, 0);
+		try {
+			copyObject(baseClass, Direction.DESERIALIZE, backingArray, offset(idx), dest, 0);
+		} catch (final InstantiationException e) {
+			throw new UndeclaredThrowableException(e);
+		}
 		return dest;
 	}
 
