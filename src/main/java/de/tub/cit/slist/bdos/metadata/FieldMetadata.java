@@ -1,32 +1,39 @@
 package de.tub.cit.slist.bdos.metadata;
 
-public class FieldMetadata implements Comparable<FieldMetadata> {
+public class FieldMetadata implements Comparable<FieldMetadata>, java.io.Serializable {
+	private static final long serialVersionUID = 1095997857221521517L;
+
+	/** name of the member field */
 	private String		fieldName;
 	/** offset within the object */
 	private long		offset;
 	/** offset in serialized form */
 	private long		serializedOffset;
+	/** length in bytes (serialized length) */
 	private long		length;
 	/** number of elements */
 	private int			elements;
+	/** type/classification of field */
 	private FieldType	type;
-	/** not-null only for arrays, collections and objects */
+	/** not-null only for arrays, collections (class of the elements) and objects */
 	private Class<?>	clazz;
+	/** Collection type */
+	private Class<?>	collectionClass;
 
 	public FieldMetadata() {
-
 	};
 
 	public FieldMetadata(final String fieldName, final long offset, final long serializedOffset, final long length, final int elements, final FieldType type,
-			final Class<?> clazz) {
+			final Class<?> clazz, final Class<?> collectionClass) {
 		super();
 		this.fieldName = fieldName;
 		this.offset = offset;
 		this.serializedOffset = serializedOffset;
-		this.elements = elements;
 		this.length = length;
+		this.elements = elements;
 		this.type = type;
 		this.clazz = clazz;
+		this.collectionClass = collectionClass;
 	}
 
 	public String getFieldName() {
@@ -85,10 +92,18 @@ public class FieldMetadata implements Comparable<FieldMetadata> {
 		this.clazz = clazz;
 	}
 
+	public Class<?> getCollectionClass() {
+		return collectionClass;
+	}
+
+	public void setCollectionClass(final Class<?> collectionClass) {
+		this.collectionClass = collectionClass;
+	}
+
 	@Override
 	public String toString() {
-		return "FieldMetadata [fieldName=" + fieldName + ", offset=" + offset + ", serializedOffset=" + serializedOffset + ", length=" + length + ", type="
-				+ type + ", clazz=" + clazz + "]";
+		return "FieldMetadata [fieldName=" + fieldName + ", offset=" + offset + ", serializedOffset=" + serializedOffset + ", length=" + length + ", elements="
+				+ elements + ", type=" + type + ", clazz=" + clazz + ", collectionClass=" + collectionClass + "]";
 	}
 
 	@Override

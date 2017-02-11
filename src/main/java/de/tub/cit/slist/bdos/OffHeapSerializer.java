@@ -4,12 +4,16 @@ import java.io.Serializable;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import de.tub.cit.slist.bdos.annotation.FixedLength;
 import de.tub.cit.slist.bdos.conf.ConfigFactory;
@@ -141,6 +145,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	 * @param target
 	 * @return added class metadata
 	 */
+	@SuppressWarnings("unchecked")
 	private static Map<Class<?>, ClassMetadata> acquireClassMetadata(final Class<?> baseclazz, final Map<Class<?>, ClassMetadata> target) {
 		final Map<Class<?>, ClassMetadata> addedClasses = new HashMap<>();
 		if (target.containsKey(baseclazz)) return addedClasses;
@@ -198,6 +203,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 							if (fixedLength != null) {
 								fieldMetadata.setType(FieldType.ARRAY_FIXED);
 								final Class<?> subtype = classType.getComponentType();
+								if (subtype.isInterface()) throw new UnsupportedOperationException("No Interface Array allowed.");
 								fieldMetadata.setClazz(subtype);
 								fieldMetadata.setElements(fixedLength.value());
 								final Map<Class<?>, ClassMetadata> subtypeMetadata = acquireClassMetadata(subtype, target);
@@ -205,6 +211,34 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 								addedClasses.putAll(subtypeMetadata);
 							} else
 								// TODO: variable-length Array
+								throw new UnsupportedOperationException();
+						} else if (Collection.class.isAssignableFrom(classType)) {
+							final FixedLength fixedLength = f.getAnnotation(FixedLength.class);
+							if (fixedLength != null) {
+								fieldMetadata.setType(FieldType.COLLECTION_FIXED);
+								if (classType.isInterface()) {
+									if (classType == List.class) {
+										// default implementation for Lists
+										fieldMetadata.setCollectionClass(ArrayList.class);
+									} else if (classType == Map.class) {
+										// default implementation for Maps
+										fieldMetadata.setCollectionClass(HashMap.class);
+									} else if (classType == Set.class) {
+										// default implementation for Sets
+										fieldMetadata.setCollectionClass(HashSet.class);
+									} else
+										throw new UnsupportedOperationException("Collection types must either be non-Interfaces, or of type List|Map|Set.");
+								} else {
+									fieldMetadata.setCollectionClass(classType);
+								}
+								final Class<?> subtype = (Class<?>) ((ParameterizedType) f.getGenericType()).getActualTypeArguments()[0];
+								fieldMetadata.setClazz(subtype);
+								fieldMetadata.setElements(fixedLength.value());
+								final Map<Class<?>, ClassMetadata> subtypeMetadata = acquireClassMetadata(subtype, target);
+								fieldLength = fixedLength.value() * target.get(subtype).getLength();
+								addedClasses.putAll(subtypeMetadata);
+							} else
+								// TODO: variable-length Collection
 								throw new UnsupportedOperationException();
 						} else
 							throw new UnsupportedOperationException();
@@ -236,7 +270,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	}
 
 	private void copyObject(final Class<?> baseclass, final Direction direction, final Object src, final long srcOffset, final Object dest,
-			final long destOffset) throws InstantiationException {
+			final long destOffset) throws InstantiationException, IllegalAccessException {
 		if (baseclass.isPrimitive()) {
 			copyPrimitive(FieldType.fromClass(baseclass), src, srcOffset, dest, destOffset);
 			return;
@@ -245,6 +279,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 		final ClassMetadata classMetadata = this.classMetadata.get(baseclass);
 		long sOff, dOff;
 		for (final FieldMetadata field : classMetadata.getFields()) {
+			long subTypeLength;
 			// add corresponding field offsets offsets
 			if (direction == Direction.SERIALIZE) {
 				sOff = srcOffset + field.getOffset();
@@ -295,7 +330,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 				}
 				break;
 			case ARRAY_FIXED:
-				final long subTypeLength = this.classMetadata.get(field.getClazz()).getLength();
+				subTypeLength = this.classMetadata.get(field.getClazz()).getLength();
 				if (direction == Direction.SERIALIZE) {
 					final Object arr = getUnsafe().getObject(src, sOff);
 					final int arrLength = Array.getLength(arr);
@@ -336,10 +371,40 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 					getUnsafe().putObject(dest, dOff, arr);
 				}
 				break;
+			case COLLECTION_FIXED:
+				subTypeLength = this.classMetadata.get(field.getClazz()).getLength();
+				if (direction == Direction.SERIALIZE) {
+					final Collection<?> coll = (Collection<?>) getUnsafe().getObject(src, sOff);
+					final int collLength = coll.size();
+					int i = 0;
+					for (final Object copySrc : coll) {
+						copyObject(field.getClazz(), direction, copySrc, 0, dest, dOff + i * subTypeLength);
+						i++;
+						if (i >= field.getElements()) {
+							break;
+						}
+					}
+					// pad with NULs
+					if (collLength < field.getElements()) {
+						getUnsafe().setMemory(dest, dOff + (collLength * subTypeLength), (field.getElements() * subTypeLength) - (collLength * subTypeLength),
+								(byte) 0);
+					}
+				} else {
+					// TODO new Instance with number of elements?
+					// final Collection<Object> coll = (Collection<Object>) getUnsafe().allocateInstance(field.getCollectionClass());
+					@SuppressWarnings("unchecked")
+					final Collection<Object> coll = (Collection<Object>) field.getCollectionClass().newInstance();
+					for (int i = 0; i < field.getElements(); i++) {
+						final Object copyDest = getUnsafe().allocateInstance(field.getClazz());
+						copyObject(field.getClazz(), direction, src, sOff + i * subTypeLength, copyDest, 0);
+						coll.add(copyDest);
+					}
+					getUnsafe().putObject(dest, dOff, coll);
+				}
+				break;
 			case ARRAY:
 			case STRING:
 			case COLLECTION:
-			case COLLECTION_FIXED:
 			case OBJECT:
 			default:
 				throw new UnsupportedOperationException();
@@ -402,7 +467,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 			try {
 				copyObject(baseClass, Direction.SERIALIZE, element, 0, backingArray, offset(idx));
 				setNull(idx, false);
-			} catch (final InstantiationException e) {
+			} catch (final InstantiationException | IllegalAccessException e) {
 				throw new UndeclaredThrowableException(e);
 			}
 		} else {
@@ -445,7 +510,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 		// UnsafeHelper.copyMemory(backingArray, offset(idx), dest, firstFieldOffset, elementSize);
 		try {
 			copyObject(baseClass, Direction.DESERIALIZE, backingArray, offset(idx), dest, 0);
-		} catch (final InstantiationException e) {
+		} catch (final InstantiationException | IllegalAccessException e) {
 			throw new UndeclaredThrowableException(e);
 		}
 		return dest;

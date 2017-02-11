@@ -1,12 +1,14 @@
 package de.tub.cit.slist.bdos.test.classes;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Random;
 
 import de.tub.cit.slist.bdos.annotation.FixedLength;
 
 public class FixedLengthClass implements RandomlyInitializable, java.io.Serializable {
-	private static final long serialVersionUID = 1548258711092401801L;
+	private static final long serialVersionUID = -3926475491171031058L;
 
 	private static final int ELEMENT_COUNT = 10;
 
@@ -19,6 +21,9 @@ public class FixedLengthClass implements RandomlyInitializable, java.io.Serializ
 	@FixedLength(ELEMENT_COUNT)
 	private Integer[] fixedIntegerArray = new Integer[ELEMENT_COUNT];
 
+	@FixedLength(ELEMENT_COUNT)
+	private List<Integer> fixedIntegerList = new ArrayList<>(ELEMENT_COUNT);
+
 	public FixedLengthClass() {
 
 	}
@@ -28,9 +33,12 @@ public class FixedLengthClass implements RandomlyInitializable, java.io.Serializ
 		randomInit(r);
 	}
 
-	public FixedLengthClass(final String fixedString) {
+	public FixedLengthClass(final String fixedString, final int[] fixedIntArray, final Integer[] fixedIntegerArray, final ArrayList<Integer> fixedIntegerList) {
 		super();
 		this.fixedString = fixedString;
+		this.fixedIntArray = fixedIntArray;
+		this.fixedIntegerArray = fixedIntegerArray;
+		this.fixedIntegerList = fixedIntegerList;
 	}
 
 	@Override
@@ -46,6 +54,9 @@ public class FixedLengthClass implements RandomlyInitializable, java.io.Serializ
 		}
 		for (int i = 0; i < ELEMENT_COUNT; i++) {
 			fixedIntegerArray[i] = r.nextInt();
+		}
+		for (int i = 0; i < ELEMENT_COUNT; i++) {
+			fixedIntegerList.add(r.nextInt());
 		}
 	}
 
@@ -73,12 +84,21 @@ public class FixedLengthClass implements RandomlyInitializable, java.io.Serializ
 		this.fixedIntegerArray = fixedIntegerArray;
 	}
 
+	public List<Integer> getFixedIntegerList() {
+		return fixedIntegerList;
+	}
+
+	public void setFixedIntegerList(final List<Integer> fixedIntegerList) {
+		this.fixedIntegerList = fixedIntegerList;
+	}
+
 	@Override
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
 		result = prime * result + Arrays.hashCode(fixedIntArray);
 		result = prime * result + Arrays.hashCode(fixedIntegerArray);
+		result = prime * result + ((fixedIntegerList == null) ? 0 : fixedIntegerList.hashCode());
 		result = prime * result + ((fixedString == null) ? 0 : fixedString.hashCode());
 		return result;
 	}
@@ -91,6 +111,9 @@ public class FixedLengthClass implements RandomlyInitializable, java.io.Serializ
 		final FixedLengthClass other = (FixedLengthClass) obj;
 		if (!Arrays.equals(fixedIntArray, other.fixedIntArray)) return false;
 		if (!Arrays.equals(fixedIntegerArray, other.fixedIntegerArray)) return false;
+		if (fixedIntegerList == null) {
+			if (other.fixedIntegerList != null) return false;
+		} else if (!fixedIntegerList.equals(other.fixedIntegerList)) return false;
 		if (fixedString == null) {
 			if (other.fixedString != null) return false;
 		} else if (!fixedString.equals(other.fixedString)) return false;
@@ -100,7 +123,7 @@ public class FixedLengthClass implements RandomlyInitializable, java.io.Serializ
 	@Override
 	public String toString() {
 		return "FixedLengthClass [fixedString=" + fixedString + ", fixedIntArray=" + Arrays.toString(fixedIntArray) + ", fixedIntegerArray="
-				+ Arrays.toString(fixedIntegerArray) + "]";
+				+ Arrays.toString(fixedIntegerArray) + ", fixedIntegerList=" + fixedIntegerList + "]";
 	}
 
 }
