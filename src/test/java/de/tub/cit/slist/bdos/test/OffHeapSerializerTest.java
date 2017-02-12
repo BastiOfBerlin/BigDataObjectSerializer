@@ -10,6 +10,7 @@ import de.tub.cit.slist.bdos.OffHeapSerializer;
 import de.tub.cit.slist.bdos.conf.ConfigFactory;
 import de.tub.cit.slist.bdos.conf.MemoryLocation;
 import de.tub.cit.slist.bdos.test.classes.FixedLengthClass;
+import de.tub.cit.slist.bdos.test.classes.GenericClass;
 import de.tub.cit.slist.bdos.test.classes.PrimitiveClass;
 import de.tub.cit.slist.bdos.test.classes.RandomlyInitializable;
 import de.tub.cit.slist.bdos.util.UnsafeHelper;
@@ -118,6 +119,19 @@ public class OffHeapSerializerTest {
 		try {
 			serializer = new OffHeapSerializer<>(FixedLengthClass.class, (new ConfigFactory()).withSize(INSTANCES).build(), 0);
 			setAndGet(serializer, FixedLengthClass.class);
+		} finally {
+			if (serializer != null) {
+				serializer.destroy();
+			}
+		}
+	}
+
+	@Test
+	public void testGenericClass() throws InstantiationException, IllegalAccessException {
+		OffHeapSerializer<GenericClass> serializer = null;
+		try {
+			serializer = new OffHeapSerializer<>(GenericClass.class, (new ConfigFactory()).withSize(INSTANCES).build(), 0);
+			setAndGet(serializer, GenericClass.class);
 		} finally {
 			if (serializer != null) {
 				serializer.destroy();

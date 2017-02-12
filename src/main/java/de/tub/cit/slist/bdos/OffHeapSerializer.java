@@ -145,7 +145,6 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	 * @param target
 	 * @return added class metadata
 	 */
-	@SuppressWarnings("unchecked")
 	private static Map<Class<?>, ClassMetadata> acquireClassMetadata(final Class<?> baseclazz, final Map<Class<?>, ClassMetadata> target) {
 		final Map<Class<?>, ClassMetadata> addedClasses = new HashMap<>();
 		if (target.containsKey(baseclazz)) return addedClasses;
@@ -240,8 +239,12 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 							} else
 								// TODO: variable-length Collection
 								throw new UnsupportedOperationException();
-						} else
-							throw new UnsupportedOperationException();
+						} else {
+							fieldMetadata.setType(FieldType.OBJECT);
+							final Map<Class<?>, ClassMetadata> subtypeMetadata = acquireClassMetadata(classType, target);
+							fieldLength = target.get(classType).getLength();
+							addedClasses.putAll(subtypeMetadata);
+						}
 
 						totalLength += fieldLength;
 						fieldMetadata.setLength(fieldLength);
@@ -402,10 +405,19 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 					getUnsafe().putObject(dest, dOff, coll);
 				}
 				break;
+			case OBJECT:
+				if (direction == Direction.SERIALIZE) {
+					final Object copySrc = getUnsafe().getObject(src, sOff);
+					copyObject(field.getClazz(), direction, copySrc, 0, dest, dOff);
+				} else {
+					final Object copyDest = getUnsafe().allocateInstance(field.getClazz());
+					copyObject(field.getClazz(), direction, src, sOff, copyDest, 0);
+					getUnsafe().putObject(dest, dOff, copyDest);
+				}
+				break;
 			case ARRAY:
 			case STRING:
 			case COLLECTION:
-			case OBJECT:
 			default:
 				throw new UnsupportedOperationException();
 
