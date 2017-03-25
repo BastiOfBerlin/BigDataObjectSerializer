@@ -71,12 +71,6 @@ public class OffHeapSerializerTest {
 		}
 	}
 
-	@Test(expected = AssertionError.class)
-	public void testZeroSize() {
-		final OffHeapSerializer<PrimitiveClass> serializer = new OffHeapSerializer<>(PrimitiveClass.class, (new ConfigFactory()).withSize(0).build(), 0);
-		serializer.setRandomAccess(0, new PrimitiveClass(r));
-	}
-
 	@Test(expected = IndexOutOfBoundsException.class)
 	public void testIndexOutOfBoundsException() {
 		final OffHeapSerializer<PrimitiveClass> serializer = new OffHeapSerializer<>(PrimitiveClass.class, (new ConfigFactory()).withSize(1).build(), 0);
