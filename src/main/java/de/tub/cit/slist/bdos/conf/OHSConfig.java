@@ -12,12 +12,13 @@ import java.util.Properties;
  */
 public class OHSConfig implements java.io.Serializable {
 
-	private static final long	serialVersionUID	= -5759600872480745404L;
+	private static final long	serialVersionUID	= 6112706157710557887L;
 	private static final String	RESOURCE_NAME		= "config/serializer.properties";
 
 	private static final String	PROP_SIZE		= "size";
 	private static final String	PROP_SIZE_TYPE	= "sizeType";
 	private static final String	PROP_LOCATION	= "location";
+	private static final String	PROP_RATIO		= "dynamicRatio";
 
 	private static final Properties defaults;
 	static {
@@ -25,6 +26,7 @@ public class OHSConfig implements java.io.Serializable {
 		defaults.setProperty(PROP_SIZE, "100");
 		defaults.setProperty(PROP_SIZE_TYPE, SizeType.ELEMENTS.name());
 		defaults.setProperty(PROP_LOCATION, MemoryLocation.NATIVE_MEMORY.name());
+		defaults.setProperty(PROP_RATIO, "0.2");
 	}
 
 	private final Properties properties;
@@ -95,6 +97,11 @@ public class OHSConfig implements java.io.Serializable {
 		} catch (final NumberFormatException e) {
 			constructNumberFormatExceptionString(builder, PROP_SIZE, "Long");
 		}
+		try {
+			getDynamicRatio();
+		} catch (final NumberFormatException e) {
+			constructNumberFormatExceptionString(builder, PROP_RATIO, "Double");
+		}
 		if (builder.length() > 0) // error
 			throw new IllegalArgumentException(builder.toString());
 	}
@@ -141,9 +148,17 @@ public class OHSConfig implements java.io.Serializable {
 		return MemoryLocation.valueOf(properties.getProperty(PROP_LOCATION));
 	}
 
+	void setDynamicRatio(final double ratio) {
+		properties.setProperty(PROP_RATIO, String.valueOf(ratio));
+	}
+
+	public double getDynamicRatio() {
+		return Double.parseDouble(properties.getProperty(PROP_RATIO));
+	}
+
 	@Override
 	public String toString() {
-		return "OHSConfig [size=" + getSize() + ", sizeType=" + getSizeType() + ", location=" + getLocation() + "]";
+		return "OHSConfig [size=" + getSize() + ", sizeType=" + getSizeType() + ", location=" + getLocation() + ", dynamicRatio=" + getDynamicRatio() + "]";
 	}
 
 	@Override

@@ -40,6 +40,7 @@ public class ConfigTest {
 		Assert.assertEquals(10, conf.getSize());
 		Assert.assertEquals(MemoryLocation.NATIVE_MEMORY, conf.getLocation());
 		Assert.assertEquals(SizeType.ELEMENTS, conf.getSizeType());
+		Assert.assertEquals(0.3, conf.getDynamicRatio(), 0d);
 	}
 
 	@Test
@@ -49,16 +50,18 @@ public class ConfigTest {
 		Assert.assertEquals(100, conf.getSize());
 		Assert.assertEquals(MemoryLocation.NATIVE_MEMORY, conf.getLocation());
 		Assert.assertEquals(SizeType.ELEMENTS, conf.getSizeType());
+		Assert.assertEquals(0.2, conf.getDynamicRatio(), 0d);
 	}
 
 	@Test
 	public void testSetProperty() {
 		final ConfigFactory factory = new ConfigFactory().withDefaults().withLocation(MemoryLocation.BYTE_ARRAY).withSize(Long.MAX_VALUE)
-				.withSizeType(SizeType.BYTES);
+				.withSizeType(SizeType.BYTES).withDynamicRatio(1d);
 		final OHSConfig conf = factory.build();
 		Assert.assertEquals(Long.MAX_VALUE, conf.getSize());
 		Assert.assertEquals(MemoryLocation.BYTE_ARRAY, conf.getLocation());
 		Assert.assertEquals(SizeType.BYTES, conf.getSizeType());
+		Assert.assertEquals(1d, conf.getDynamicRatio(), 0d);
 	}
 
 	@Test(expected = IllegalArgumentException.class)

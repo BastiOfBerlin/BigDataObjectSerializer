@@ -17,7 +17,7 @@ public class ConfigFactory {
 
 	/**
 	 * Sets the size.
-	 * 
+	 *
 	 * @param size
 	 * @return <code>this</code>
 	 */
@@ -28,7 +28,7 @@ public class ConfigFactory {
 
 	/**
 	 * Sets the {@link SizeType}
-	 * 
+	 *
 	 * @param type
 	 * @return <code>this</code>
 	 */
@@ -39,7 +39,7 @@ public class ConfigFactory {
 
 	/**
 	 * Sets the {@link MemoryLocation}
-	 * 
+	 *
 	 * @param location
 	 * @return <code>this</code>
 	 */
@@ -49,8 +49,19 @@ public class ConfigFactory {
 	}
 
 	/**
+	 * Sets the ratio used for dynamic-length elements (Strings, Arrays, Collections)
+	 *
+	 * @param ratio
+	 * @return <code>this</code>
+	 */
+	public ConfigFactory withDynamicRatio(final double ratio) {
+		config.setDynamicRatio(ratio);
+		return this;
+	}
+
+	/**
 	 * Loads defaults from default file.
-	 * 
+	 *
 	 * @return <code>this</code>
 	 *
 	 * @see {@link OHSConfig#loadPropertiesFromFile()}
@@ -62,7 +73,7 @@ public class ConfigFactory {
 
 	/**
 	 * Loads defaults from specified file.
-	 * 
+	 *
 	 * @param filename
 	 * @return <code>this</code>
 	 * @throws FileNotFoundException
@@ -76,7 +87,7 @@ public class ConfigFactory {
 
 	/**
 	 * Loads defaults from given file.
-	 * 
+	 *
 	 * @param f {@link File}
 	 * @return <code>this</code>
 	 * @throws FileNotFoundException
@@ -91,7 +102,7 @@ public class ConfigFactory {
 
 	/**
 	 * Loads defaults from {@link InputStream}.
-	 * 
+	 *
 	 * @param stream
 	 * @return <code>this</code>
 	 * @throws FileNotFoundException
@@ -106,7 +117,7 @@ public class ConfigFactory {
 
 	/**
 	 * Constructs the config object.
-	 * 
+	 *
 	 * @return {@link OHSConfig}
 	 */
 	public OHSConfig build() {
