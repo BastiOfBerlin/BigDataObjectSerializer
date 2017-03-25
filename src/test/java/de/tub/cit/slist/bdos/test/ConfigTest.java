@@ -74,4 +74,16 @@ public class ConfigTest {
 		new ConfigFactory().withDefaults("foobar");
 	}
 
+	@Test(expected = IllegalArgumentException.class)
+	public void testInvalidSize() {
+		new ConfigFactory().withDefaults().withLocation(MemoryLocation.BYTE_ARRAY).withSize(Long.MIN_VALUE).withSizeType(SizeType.BYTES).withDynamicRatio(1d)
+				.build();
+	}
+
+	@Test(expected = IllegalArgumentException.class)
+	public void testInvalidRatio() {
+		new ConfigFactory().withDefaults().withLocation(MemoryLocation.BYTE_ARRAY).withSize(Long.MAX_VALUE).withSizeType(SizeType.BYTES).withDynamicRatio(2d)
+				.build();
+	}
+
 }

@@ -121,6 +121,7 @@ public class ConfigFactory {
 	 * @return {@link OHSConfig}
 	 */
 	public OHSConfig build() {
+		config.validateProperties();
 		return config;
 	}
 

@@ -80,7 +80,7 @@ public class OHSConfig implements java.io.Serializable {
 	 * Validates the properties by checking for valid enum constants and number formats. Throws an {@link IllegalArgumentException} if any property is found
 	 * invalid.
 	 */
-	private void validateProperties() {
+	void validateProperties() {
 		final StringBuilder builder = new StringBuilder();
 		try {
 			getSizeType();
@@ -93,12 +93,18 @@ public class OHSConfig implements java.io.Serializable {
 			constructEnumExceptionString(builder, PROP_LOCATION, MemoryLocation.values());
 		}
 		try {
-			getSize();
+			final long size = getSize();
+			if (size < 1) {
+				constructInvalidValueRangeString(builder, PROP_SIZE, String.valueOf(size), "1", "maxInt");
+			}
 		} catch (final NumberFormatException e) {
 			constructNumberFormatExceptionString(builder, PROP_SIZE, "Long");
 		}
 		try {
-			getDynamicRatio();
+			final double ratio = getDynamicRatio();
+			if (ratio < 0 || ratio > 1) {
+				constructInvalidValueRangeString(builder, PROP_SIZE, String.valueOf(ratio), "0.0", "1.0");
+			}
 		} catch (final NumberFormatException e) {
 			constructNumberFormatExceptionString(builder, PROP_RATIO, "Double");
 		}
@@ -108,7 +114,7 @@ public class OHSConfig implements java.io.Serializable {
 
 	private void constructNumberFormatExceptionString(final StringBuilder builder, final String propName, final String type) {
 		builder.append("Illegal value of property '").append(propName).append("': ").append(properties.getProperty(propName))
-				.append(". Valid values are of type ").append(type).append(". ");
+				.append(". Valid values are of type ").append(type).append(".\n");
 	}
 
 	@SuppressWarnings("rawtypes")
@@ -121,7 +127,13 @@ public class OHSConfig implements java.io.Serializable {
 			}
 			builder.append(e.name());
 		}
-		builder.append("]. ");
+		builder.append("].\n");
+	}
+
+	private void constructInvalidValueRangeString(final StringBuilder builder, final String propName, final String value, final String minValue,
+			final String maxValue) {
+		builder.append("Illegal value range for property '").append(propName).append("': ").append(value).append(". [").append(minValue).append("-")
+				.append(maxValue).append("].\n");
 	}
 
 	void setSize(final long size) {
