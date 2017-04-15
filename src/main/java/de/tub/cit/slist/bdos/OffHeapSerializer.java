@@ -44,6 +44,10 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	private final long							memorySize;
 	/** max number of elements */
 	private final long							maxElementCount;
+	/** start address of memory for variable-length elements */
+	private final long							dynamicMemoryStart;
+	/** size of allocated memory for variable-length elements */
+	private final long							dynamicMemorySize;
 	/** optional byte array, can be used instead of native (off-heap) memory */
 	private byte[]								backingArray	= null;
 	/** offset of first field within object */
@@ -104,12 +108,16 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 		switch (config.getSizeType()) {
 		case BYTES:
 			this.memorySize = size;
-			this.maxElementCount = size / this.nodeSize;
+			long staticMemorySize = (long) (this.memorySize * (1 - config.getDynamicRatio()));
+			this.maxElementCount = staticMemorySize / this.nodeSize;
+			this.dynamicMemorySize = this.memorySize - (this.maxElementCount * this.nodeSize); // adjust to use every byte (rounding effects)
 			break;
 		case ELEMENTS:
 		default:
-			this.memorySize = size * this.nodeSize;
 			this.maxElementCount = size;
+			staticMemorySize = this.maxElementCount * this.nodeSize;
+			this.memorySize = (long) (staticMemorySize / (1 - config.getDynamicRatio()));
+			this.dynamicMemorySize = this.memorySize - staticMemorySize;
 			break;
 		}
 
@@ -126,6 +134,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 			this.address = UnsafeHelper.toAddress(this.backingArray) + Unsafe.ARRAY_BYTE_BASE_OFFSET;
 			break;
 		}
+		this.dynamicMemoryStart = this.address + this.dynamicMemorySize;
 	}
 
 	/**
