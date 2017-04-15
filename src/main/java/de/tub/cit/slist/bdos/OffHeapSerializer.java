@@ -151,12 +151,12 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	 * get metadata for <code>baseclazz</code> and store it in <code>target</code>
 	 *
 	 * @param baseclazz
-	 * @param target
+	 * @param classMetadataMap
 	 * @return added class metadata
 	 */
-	private static Map<Class<?>, ClassMetadata> acquireClassMetadata(final Class<?> baseclazz, final Map<Class<?>, ClassMetadata> target) {
+	private static Map<Class<?>, ClassMetadata> acquireClassMetadata(final Class<?> baseclazz, final Map<Class<?>, ClassMetadata> classMetadataMap) {
 		final Map<Class<?>, ClassMetadata> addedClasses = new HashMap<>();
-		if (target.containsKey(baseclazz)) return addedClasses;
+		if (classMetadataMap.containsKey(baseclazz)) return addedClasses;
 
 		Class<?> clazz = baseclazz;
 		final List<FieldMetadata> fields = new ArrayList<>();
@@ -214,8 +214,8 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 								if (subtype.isInterface()) throw new UnsupportedOperationException("No Interface Array allowed.");
 								fieldMetadata.setClazz(subtype);
 								fieldMetadata.setElements(fixedLength.value());
-								final Map<Class<?>, ClassMetadata> subtypeMetadata = acquireClassMetadata(subtype, target);
-								fieldLength = fixedLength.value() * target.get(subtype).getLength();
+								final Map<Class<?>, ClassMetadata> subtypeMetadata = acquireClassMetadata(subtype, classMetadataMap);
+								fieldLength = fixedLength.value() * classMetadataMap.get(subtype).getLength();
 								addedClasses.putAll(subtypeMetadata);
 							} else
 								// TODO: variable-length Array
@@ -242,16 +242,16 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 								final Class<?> subtype = (Class<?>) ((ParameterizedType) f.getGenericType()).getActualTypeArguments()[0];
 								fieldMetadata.setClazz(subtype);
 								fieldMetadata.setElements(fixedLength.value());
-								final Map<Class<?>, ClassMetadata> subtypeMetadata = acquireClassMetadata(subtype, target);
-								fieldLength = fixedLength.value() * target.get(subtype).getLength();
+								final Map<Class<?>, ClassMetadata> subtypeMetadata = acquireClassMetadata(subtype, classMetadataMap);
+								fieldLength = fixedLength.value() * classMetadataMap.get(subtype).getLength();
 								addedClasses.putAll(subtypeMetadata);
 							} else
 								// TODO: variable-length Collection
 								throw new UnsupportedOperationException();
 						} else {
 							fieldMetadata.setType(FieldType.OBJECT);
-							final Map<Class<?>, ClassMetadata> subtypeMetadata = acquireClassMetadata(classType, target);
-							fieldLength = target.get(classType).getLength();
+							final Map<Class<?>, ClassMetadata> subtypeMetadata = acquireClassMetadata(classType, classMetadataMap);
+							fieldLength = classMetadataMap.get(classType).getLength();
 							addedClasses.putAll(subtypeMetadata);
 						}
 
@@ -266,7 +266,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 		final ClassMetadata classMeta = new ClassMetadata(totalLength, fields.toArray(new FieldMetadata[fields.size()]));
 		classMeta.calcSerializedOffsets();
 		addedClasses.put(baseclazz, classMeta);
-		target.putAll(addedClasses);
+		classMetadataMap.putAll(addedClasses);
 		return addedClasses;
 	}
 
@@ -718,7 +718,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	}
 
 	/**
-	 * Returns the offset to the <code>idx</code>th element.
+	 * Returns the offset to the <code>idx</code><sup>th</sup> element.
 	 *
 	 * @param idx
 	 * @return
