@@ -136,16 +136,17 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 		default:
 			this.address = getUnsafe().allocateMemory(this.memorySize);
 			getUnsafe().setMemory(address, this.memorySize, (byte) 0);
+			this.dynamicMemoryStart = this.address + staticMemorySize;
 			break;
 		case BYTE_ARRAY:
 			if (this.memorySize > Integer.MAX_VALUE) throw new IllegalArgumentException(
 					"When using BYTE_ARRAY location, max. memory size is " + Integer.MAX_VALUE + ", tried to allocate " + this.memorySize);
 			this.backingArray = new byte[(int) this.memorySize];
 			this.address = UnsafeHelper.toAddress(this.backingArray) + Unsafe.ARRAY_BYTE_BASE_OFFSET;
+			this.dynamicMemoryStart = staticMemorySize;
 			break;
 		}
 
-		this.dynamicMemoryStart = this.address + staticMemorySize;
 		// init free block list
 		this.firstFreeDynamicBlock = this.dynamicMemoryStart;
 		getUnsafe().putLong(this.backingArray, this.firstFreeDynamicBlock, this.dynamicMemorySize);
