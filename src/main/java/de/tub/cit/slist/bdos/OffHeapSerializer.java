@@ -18,6 +18,7 @@ import java.util.Set;
 import de.tub.cit.slist.bdos.annotation.FixedLength;
 import de.tub.cit.slist.bdos.conf.ConfigFactory;
 import de.tub.cit.slist.bdos.conf.OHSConfig;
+import de.tub.cit.slist.bdos.exception.OutOfDynamicMemoryException;
 import de.tub.cit.slist.bdos.metadata.ClassMetadata;
 import de.tub.cit.slist.bdos.metadata.FieldMetadata;
 import de.tub.cit.slist.bdos.metadata.FieldType;
@@ -27,11 +28,15 @@ import sun.misc.Unsafe;
 @SuppressWarnings("restriction")
 public class OffHeapSerializer<T extends Serializable> implements Serializable {
 
-	private static final long	serialVersionUID		= -6348155422688768649L;
+	private static final long	serialVersionUID				= -6348155422688768649L;
 	/** size of the status metadata */
-	public static final int		METADATA_STATUS_SIZE	= 1;
+	public static final int		METADATA_STATUS_SIZE			= 1;
 	/** offset of status byte(s) within metadata */
-	public static final int		STATUS_OFFSET			= 0;
+	public static final int		STATUS_OFFSET					= 0;
+	/** size of the dynamic metadata */
+	public static final int		DYNAMIC_METADATA_SIZE			= UnsafeHelper.LONG_FIELD_SIZE;
+	/** offset of the pointer to the next free block within the free-block list */
+	public static final int		FREE_LIST_NEXT_POINTER_OFFSET	= UnsafeHelper.LONG_FIELD_SIZE;
 
 	/** Flag NULL-Status */
 	public static final byte	BITMASK_NULL	= 0b00000001;
@@ -39,25 +44,29 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	public static final byte	RESERVED_FLAGS	= 0b00000111;
 
 	/** start address of allocated memory */
-	private final long							address;
+	private final long	address;
 	/** overall size of allocated memory */
-	private final long							memorySize;
+	private final long	memorySize;
 	/** max number of elements */
-	private final long							maxElementCount;
+	private final long	maxElementCount;
 	/** start address of memory for variable-length elements */
-	private final long							dynamicMemoryStart;
+	private final long	dynamicMemoryStart;
 	/** size of allocated memory for variable-length elements */
-	private final long							dynamicMemorySize;
+	private final long	dynamicMemorySize;
 	/** optional byte array, can be used instead of native (off-heap) memory */
-	private byte[]								backingArray	= null;
+	private byte[]		backingArray	= null;
 	/** offset of first field within object */
-	private final long							firstFieldOffset;
+	private final long	firstFieldOffset;
 	/** data size per element; <=> size of object excluding headers */
-	private final long							elementSize;
+	private final long	elementSize;
 	/** size of metadata */
-	private final long							metadataSize;
+	private final long	metadataSize;
 	/** size of element and meta data */
-	private final long							nodeSize;
+	private final long	nodeSize;
+
+	/** pointer to first free dynamic block, forms linked list */
+	private long firstFreeDynamicBlock;
+
 	/** metadata of persisted classes */
 	private final Map<Class<?>, ClassMetadata>	classMetadata	= new HashMap<>();
 	/** class to be saved */
@@ -105,10 +114,11 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 		this.metadataSize = METADATA_STATUS_SIZE + metadataSize;
 		this.nodeSize = this.elementSize + this.metadataSize;
 
+		long staticMemorySize;
 		switch (config.getSizeType()) {
 		case BYTES:
 			this.memorySize = size;
-			long staticMemorySize = (long) (this.memorySize * (1 - config.getDynamicRatio()));
+			staticMemorySize = (long) (this.memorySize * (1 - config.getDynamicRatio()));
 			this.maxElementCount = staticMemorySize / this.nodeSize;
 			this.dynamicMemorySize = this.memorySize - (this.maxElementCount * this.nodeSize); // adjust to use every byte (rounding effects)
 			break;
@@ -134,7 +144,11 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 			this.address = UnsafeHelper.toAddress(this.backingArray) + Unsafe.ARRAY_BYTE_BASE_OFFSET;
 			break;
 		}
-		this.dynamicMemoryStart = this.address + this.dynamicMemorySize;
+
+		this.dynamicMemoryStart = this.address + staticMemorySize;
+		// init free block list
+		this.firstFreeDynamicBlock = this.dynamicMemoryStart;
+		getUnsafe().putLong(this.backingArray, this.firstFreeDynamicBlock, this.dynamicMemorySize);
 	}
 
 	/**
@@ -432,6 +446,171 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 
 			}
 		}
+	}
+
+	private void copyObjectDynamic(final Class<?> baseclass, final Direction direction, final Object src, final long srcOffset, final Object dest,
+			final long destOffset) {
+		// TODO
+		if (direction == Direction.SERIALIZE) {
+
+		} else {
+
+		}
+	}
+
+	/**
+	 * ersten freien block entsprechender groesse finden. fehler, falls kein platz.
+	 *
+	 * @param objectSize
+	 * @return
+	 * @throws OutOfDynamicMemoryException
+	 */
+	private FreeBlockAddress findFirstFreeDynamicBlock(final long objectSize) throws OutOfDynamicMemoryException {
+		if (firstFreeDynamicBlock == 0)
+			throw new OutOfDynamicMemoryException(String.format("Cannot allocate %d bytes of dynamic memory.", objectSize + UnsafeHelper.LONG_FIELD_SIZE));
+		return findFreeDynamicBlock(objectSize, firstFreeDynamicBlock);
+	}
+
+	private FreeBlockAddress findFreeDynamicBlock(final long objectSize, final long blockAddr) throws OutOfDynamicMemoryException {
+		return findFreeDynamicBlock(objectSize, new FreeBlockAddress(blockAddr));
+	}
+
+	private FreeBlockAddress findFreeDynamicBlock(final long objectSize, final FreeBlockAddress blockAddr) throws OutOfDynamicMemoryException {
+		if (getUnsafe().getLong(backingArray, blockAddr.address) > objectSize + UnsafeHelper.LONG_FIELD_SIZE)
+			return blockAddr;
+		else {
+			// look for next block
+			final long nextBlockAddr = blockAddr.address + FREE_LIST_NEXT_POINTER_OFFSET;
+			if (nextBlockAddr > dynamicMemorySize)
+				throw new OutOfDynamicMemoryException(String.format("Cannot allocate %d bytes of dynamic memory.", objectSize + UnsafeHelper.LONG_FIELD_SIZE));
+			final long nextBlock = getUnsafe().getLong(backingArray, nextBlockAddr);
+			if (nextBlock == 0) // last free block reached
+				throw new OutOfDynamicMemoryException(String.format("Cannot allocate %d bytes of dynamic memory.", objectSize + UnsafeHelper.LONG_FIELD_SIZE));
+			blockAddr.previousAddress = blockAddr.address;
+			blockAddr.address = nextBlock;
+			return findFreeDynamicBlock(objectSize, blockAddr);
+		}
+	}
+
+	/**
+	 * Allocate first free block with sufficient size and update free-block management info.
+	 *
+	 * @param objectSize
+	 * @return start address of the new block
+	 * @throws OutOfDynamicMemoryException no block of sufficient size left
+	 */
+	private long allocateDynamicMemory(final long objectSize) throws OutOfDynamicMemoryException {
+		final FreeBlockAddress addr = findFirstFreeDynamicBlock(objectSize);
+		final long requiredSize = objectSize + DYNAMIC_METADATA_SIZE;
+		final long blockSize = getUnsafe().getLong(backingArray, addr.address);
+		final long nextBlock = getUnsafe().getLong(backingArray, addr.address + FREE_LIST_NEXT_POINTER_OFFSET); // is 0 if last free
+		final long nextBlockToSet;
+		if (blockSize > requiredSize) {
+			// split block
+			nextBlockToSet = addr.address + requiredSize;
+			// update size of free block
+			getUnsafe().putLong(backingArray, nextBlockToSet, blockSize - requiredSize);
+			// set pointer to next block
+			getUnsafe().putLong(backingArray, nextBlockToSet + FREE_LIST_NEXT_POINTER_OFFSET, nextBlock);
+		} else {
+			nextBlockToSet = nextBlock;
+		}
+
+		// update previous block to point to new next free block
+		if (addr.previousAddress < 0) {
+			// first free block
+			firstFreeDynamicBlock = nextBlockToSet;
+		} else {
+			getUnsafe().putLong(backingArray, addr.previousAddress + FREE_LIST_NEXT_POINTER_OFFSET, nextBlockToSet);
+			// NULify pointer of this block
+			getUnsafe().putLong(backingArray, addr.address + FREE_LIST_NEXT_POINTER_OFFSET, 0);
+		}
+		// set size
+		getUnsafe().putLong(backingArray, addr.address, objectSize);
+		return addr.address;
+	}
+
+	/**
+	 * Deallocates the block at the given address.
+	 *
+	 * This means, memory is being NULified and free-block management info updated.
+	 *
+	 * @param address
+	 * @return size of deallocated memory
+	 */
+	private long deallocateDynamicMemory(final long address) {
+		if (address < dynamicMemoryStart || address > dynamicMemoryStart + dynamicMemorySize)
+			throw new IndexOutOfBoundsException(String.format("Address not in dynamic memory (0x%x)", address));
+
+		final long blockSize = getUnsafe().getLong(backingArray, address) + DYNAMIC_METADATA_SIZE;
+		// clear block contents
+		getUnsafe().setMemory(backingArray, address, blockSize, (byte) 0);
+
+		if (firstFreeDynamicBlock > 0) {
+			long previousFreeBlock = firstFreeDynamicBlock;
+			long nextFreeBlock = getUnsafe().getLong(backingArray, previousFreeBlock + FREE_LIST_NEXT_POINTER_OFFSET);
+			while (nextFreeBlock < address && nextFreeBlock != 0) {
+				previousFreeBlock = nextFreeBlock;
+				nextFreeBlock = getUnsafe().getLong(backingArray, previousFreeBlock + FREE_LIST_NEXT_POINTER_OFFSET);
+			}
+			if (address < firstFreeDynamicBlock) {
+				// this will be the first free block
+				if (address + blockSize < firstFreeDynamicBlock) {
+					getUnsafe().putLong(backingArray, address + FREE_LIST_NEXT_POINTER_OFFSET, firstFreeDynamicBlock);
+					getUnsafe().putLong(backingArray, address, blockSize);
+				} else {
+					// adjacent blocks
+					final long sizeAdjacentBlock = getUnsafe().getLong(backingArray, firstFreeDynamicBlock);
+					final long nextPointerAdjacentBlock = getUnsafe().getLong(backingArray, firstFreeDynamicBlock + FREE_LIST_NEXT_POINTER_OFFSET);
+					getUnsafe().putLong(backingArray, address + FREE_LIST_NEXT_POINTER_OFFSET, nextPointerAdjacentBlock);
+					getUnsafe().putLong(backingArray, address, blockSize + sizeAdjacentBlock);
+					getUnsafe().putLong(backingArray, firstFreeDynamicBlock, 0);
+					getUnsafe().putLong(backingArray, firstFreeDynamicBlock + FREE_LIST_NEXT_POINTER_OFFSET, 0);
+				}
+				firstFreeDynamicBlock = address;
+			} else if (nextFreeBlock == 0) {
+				// this will be the last free block
+				final long sizePreviousFreeBlock = getUnsafe().getLong(backingArray, previousFreeBlock);
+				if (previousFreeBlock + sizePreviousFreeBlock < address) {
+					getUnsafe().putLong(backingArray, previousFreeBlock + FREE_LIST_NEXT_POINTER_OFFSET, address);
+					getUnsafe().putLong(backingArray, address, blockSize);
+				} else {
+					// adjacent blocks
+					getUnsafe().putLong(backingArray, previousFreeBlock, blockSize + sizePreviousFreeBlock);
+				}
+			} else {
+				// free blocks ahead and behind
+				long totalBlockSize = blockSize;
+				boolean nextFreeBlockAdjacent = false;
+				if (address + blockSize >= nextFreeBlock) {
+					// next free block is adjacent
+					nextFreeBlockAdjacent = true;
+					totalBlockSize += getUnsafe().getLong(backingArray, nextFreeBlock);
+					nextFreeBlock = getUnsafe().getLong(backingArray, nextFreeBlock + FREE_LIST_NEXT_POINTER_OFFSET);
+					getUnsafe().putLong(backingArray, nextFreeBlock, 0);
+					getUnsafe().putLong(backingArray, nextFreeBlock + FREE_LIST_NEXT_POINTER_OFFSET, 0);
+				}
+				final long sizePreviousFreeBlock = getUnsafe().getLong(backingArray, previousFreeBlock);
+				if (previousFreeBlock + sizePreviousFreeBlock < address) {
+					// previous free block is adjacent
+					totalBlockSize += sizePreviousFreeBlock;
+					getUnsafe().putLong(backingArray, previousFreeBlock, totalBlockSize);
+					if (nextFreeBlockAdjacent) {
+						getUnsafe().putLong(backingArray, previousFreeBlock + FREE_LIST_NEXT_POINTER_OFFSET, nextFreeBlock);
+					}
+				} else {
+					// set metadata in current block
+					getUnsafe().putLong(backingArray, address, totalBlockSize);
+					getUnsafe().putLong(backingArray, address + FREE_LIST_NEXT_POINTER_OFFSET, nextFreeBlock);
+					getUnsafe().putLong(backingArray, previousFreeBlock + FREE_LIST_NEXT_POINTER_OFFSET, address);
+				}
+			}
+		} else {
+			// no free blocks
+			firstFreeDynamicBlock = address;
+			getUnsafe().putLong(backingArray, address, blockSize);
+		}
+		return blockSize;
 	}
 
 	/**
@@ -764,6 +943,18 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 
 	private enum Direction {
 		SERIALIZE, DESERIALIZE
+	}
+
+	private class FreeBlockAddress {
+		long	address;
+		long	previousAddress	= -1;
+
+		FreeBlockAddress() {
+		}
+
+		FreeBlockAddress(final long address) {
+			this.address = address;
+		}
 	}
 
 }
