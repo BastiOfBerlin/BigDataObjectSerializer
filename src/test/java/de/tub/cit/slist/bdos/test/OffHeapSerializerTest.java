@@ -1,5 +1,6 @@
 package de.tub.cit.slist.bdos.test;
 
+import java.util.Arrays;
 import java.util.Random;
 
 import org.junit.Assert;
@@ -62,11 +63,13 @@ public class OffHeapSerializerTest {
 			final T instance = clazz.newInstance();
 			instance.randomInit(r);
 			ref[i] = instance;
-			// System.out.println(instance);
 			serializer.setRandomAccess(i, instance);
 		}
+		assertEquals(serializer, ref);
+	}
+
+	private <T extends RandomlyInitializable> void assertEquals(final OffHeapSerializer<T> serializer, final RandomlyInitializable[] ref) {
 		for (int i = 0; i < INSTANCES; i++) {
-			// Assert.assertSame(ref[i], serializer.get(i));
 			Assert.assertEquals(ref[i], serializer.getRandomAccess(i));
 		}
 	}
@@ -113,6 +116,75 @@ public class OffHeapSerializerTest {
 		try {
 			serializer = new OffHeapSerializer<>(FixedLengthClass.class, (new ConfigFactory()).withSize(INSTANCES).build(), 0);
 			setAndGet(serializer, FixedLengthClass.class);
+		} finally {
+			if (serializer != null) {
+				serializer.destroy();
+			}
+		}
+	}
+
+	@Test
+	public void testFixedLengthWithLessElements() throws InstantiationException, IllegalAccessException {
+		OffHeapSerializer<FixedLengthClass> serializer = null;
+		try {
+			serializer = new OffHeapSerializer<>(FixedLengthClass.class, (new ConfigFactory()).withSize(INSTANCES).build(), 0);
+			final FixedLengthClass[] ref = new FixedLengthClass[INSTANCES];
+			for (int i = 0; i < INSTANCES; i++) {
+				final FixedLengthClass instance = FixedLengthClass.class.newInstance();
+				instance.randomInit(r);
+				// cut out one element per field
+				instance.setFixedString(instance.getFixedString().substring(1));
+				instance.setFixedIntArray(Arrays.copyOfRange(instance.getFixedIntArray(), 0, instance.getFixedIntArray().length - 1));
+				instance.setFixedIntegerArray(Arrays.copyOfRange(instance.getFixedIntegerArray(), 0, instance.getFixedIntegerArray().length - 1));
+				instance.getFixedIntegerList().remove(0);
+				ref[i] = instance;
+				serializer.setRandomAccess(i, instance);
+			}
+			assertEquals(serializer, ref);
+		} finally {
+			if (serializer != null) {
+				serializer.destroy();
+			}
+		}
+	}
+
+	@Test
+	@Ignore
+	public void testFixedLengthEmpty() throws InstantiationException, IllegalAccessException {
+		OffHeapSerializer<FixedLengthClass> serializer = null;
+		try {
+			serializer = new OffHeapSerializer<>(FixedLengthClass.class, (new ConfigFactory()).withSize(INSTANCES).build(), 0);
+			final FixedLengthClass[] ref = new FixedLengthClass[INSTANCES];
+			for (int i = 0; i < INSTANCES; i++) {
+				final FixedLengthClass instance = new FixedLengthClass();
+				instance.setFixedString("");
+				ref[i] = instance;
+				serializer.setRandomAccess(i, instance);
+			}
+			assertEquals(serializer, ref);
+		} finally {
+			if (serializer != null) {
+				serializer.destroy();
+			}
+		}
+	}
+
+	@Test
+	public void testFixedLengthNull() throws InstantiationException, IllegalAccessException {
+		OffHeapSerializer<FixedLengthClass> serializer = null;
+		try {
+			serializer = new OffHeapSerializer<>(FixedLengthClass.class, (new ConfigFactory()).withSize(INSTANCES).build(), 0);
+			final FixedLengthClass[] ref = new FixedLengthClass[INSTANCES];
+			for (int i = 0; i < INSTANCES; i++) {
+				final FixedLengthClass instance = new FixedLengthClass();
+				instance.setFixedString(null);
+				instance.setFixedIntArray(null);
+				instance.setFixedIntegerArray(null);
+				instance.setFixedIntegerList(null);
+				ref[i] = instance;
+				serializer.setRandomAccess(i, instance);
+			}
+			assertEquals(serializer, ref);
 		} finally {
 			if (serializer != null) {
 				serializer.destroy();
