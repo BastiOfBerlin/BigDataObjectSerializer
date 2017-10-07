@@ -274,7 +274,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 							fieldLength = classMetadataMap.get(classType).getLength();
 							addedClasses.putAll(subtypeMetadata);
 						}
-
+						fieldLength += UnsafeHelper.BOOLEAN_FIELD_SIZE; // isNull indicator
 						totalLength += fieldLength;
 						fieldMetadata.setLength(fieldLength);
 						fields.add(fieldMetadata);
@@ -309,6 +309,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 		}
 
 		final ClassMetadata classMetadata = this.classMetadata.get(baseclass);
+
 		long sOff, dOff;
 		for (final FieldMetadata field : classMetadata.getFields()) {
 			long subTypeLength;
@@ -338,17 +339,18 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 					writeFixedLength(s != null ? stringLength : null, dest, dOff);
 					if (s != null) {
 						final char[] arr = new char[stringLength];
-						s.getChars(0, arr.length, arr, 0);
-						for (int i = 0; i < arr.length; i++) {
+						s.getChars(0, stringLength, arr, 0);
+						for (int i = 0; i < stringLength; i++) {
 							// copyPrimitive(FieldType.CHAR, arr, Unsafe.ARRAY_CHAR_BASE_OFFSET + i * UnsafeHelper.CHAR_FIELD_SIZE, dest,
 							// dOff + i * UnsafeHelper.CHAR_FIELD_SIZE);
 							copyObject(char.class, direction, arr, Unsafe.ARRAY_CHAR_BASE_OFFSET + i * UnsafeHelper.CHAR_FIELD_SIZE, dest,
-									dOff + UnsafeHelper.INT_FIELD_SIZE + i * UnsafeHelper.CHAR_FIELD_SIZE);
+									dOff + UnsafeHelper.BOOLEAN_FIELD_SIZE + UnsafeHelper.INT_FIELD_SIZE + i * UnsafeHelper.CHAR_FIELD_SIZE);
 						}
 					}
 					// pad with NULs
 					if (stringLength < field.getElements()) {
-						getUnsafe().setMemory(dest, dOff + UnsafeHelper.INT_FIELD_SIZE + (stringLength * UnsafeHelper.CHAR_FIELD_SIZE),
+						getUnsafe().setMemory(dest,
+								dOff + UnsafeHelper.BOOLEAN_FIELD_SIZE + UnsafeHelper.INT_FIELD_SIZE + (stringLength * UnsafeHelper.CHAR_FIELD_SIZE),
 								(field.getElements() * UnsafeHelper.CHAR_FIELD_SIZE) - (stringLength * UnsafeHelper.CHAR_FIELD_SIZE), (byte) 0);
 					}
 				} else {
@@ -358,7 +360,8 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 						for (int i = 0; i < stringLength; i++) {
 							// copyPrimitive(FieldType.CHAR, src, sOff + i * UnsafeHelper.CHAR_FIELD_SIZE, arr,
 							// Unsafe.ARRAY_CHAR_BASE_OFFSET + i * UnsafeHelper.CHAR_FIELD_SIZE);
-							copyObject(char.class, direction, src, sOff + UnsafeHelper.INT_FIELD_SIZE + i * UnsafeHelper.CHAR_FIELD_SIZE, arr,
+							copyObject(char.class, direction, src,
+									sOff + UnsafeHelper.BOOLEAN_FIELD_SIZE + UnsafeHelper.INT_FIELD_SIZE + i * UnsafeHelper.CHAR_FIELD_SIZE, arr,
 									Unsafe.ARRAY_CHAR_BASE_OFFSET + i * UnsafeHelper.CHAR_FIELD_SIZE);
 						}
 						getUnsafe().putObject(dest, dOff, String.valueOf(arr));
@@ -375,19 +378,28 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 					writeFixedLength(arr != null ? arrLength : null, dest, dOff);
 					for (int i = 0; i < arrLength; i++) {
 						Object copySrc;
-						long copySrcOffset;
+						long copySrcOffset = 0, copyDestOffset = 0;
 						if (field.getClazz().isPrimitive()) {
 							copySrc = arr;
 							copySrcOffset = Unsafe.ARRAY_OBJECT_BASE_OFFSET + i * UnsafeHelper.PRIMITIVE_LENGTHS.get(field.getClazz());
 						} else {
 							copySrc = Array.get(arr, i);
-							copySrcOffset = 0;
+							getUnsafe().putBoolean(dest, dOff + UnsafeHelper.BOOLEAN_FIELD_SIZE + UnsafeHelper.INT_FIELD_SIZE + i * subTypeLength,
+									copySrc == null);
+							copyDestOffset = UnsafeHelper.BOOLEAN_FIELD_SIZE;
 						}
-						copyObject(field.getClazz(), direction, copySrc, copySrcOffset, dest, dOff + UnsafeHelper.INT_FIELD_SIZE + i * subTypeLength);
+						if (copySrc != null) {
+							copyObject(field.getClazz(), direction, copySrc, copySrcOffset, dest,
+									dOff + UnsafeHelper.BOOLEAN_FIELD_SIZE + UnsafeHelper.INT_FIELD_SIZE + i * subTypeLength + copyDestOffset);
+						} else {
+							getUnsafe().setMemory(dest,
+									dOff + UnsafeHelper.BOOLEAN_FIELD_SIZE + UnsafeHelper.INT_FIELD_SIZE + i * subTypeLength + copyDestOffset,
+									subTypeLength - 1, (byte) 0);
+						}
 					}
 					// pad with NULs
 					if (arrLength < field.getElements()) {
-						getUnsafe().setMemory(dest, dOff + UnsafeHelper.INT_FIELD_SIZE + (arrLength * subTypeLength),
+						getUnsafe().setMemory(dest, dOff + UnsafeHelper.BOOLEAN_FIELD_SIZE + UnsafeHelper.INT_FIELD_SIZE + (arrLength * subTypeLength),
 								(field.getElements() * subTypeLength) - (arrLength * subTypeLength), (byte) 0);
 					}
 				} else {
@@ -396,18 +408,25 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 						final Object arr = Array.newInstance(field.getClazz(), arrLength);
 						for (int i = 0; i < arrLength; i++) {
 							Object copyDest;
-							long copyDestOffset;
+							long copySrcOffset = 0, copyDestOffset = 0;
 							if (field.getClazz().isPrimitive()) {
 								copyDest = arr;
 								copyDestOffset = Unsafe.ARRAY_OBJECT_BASE_OFFSET + i * UnsafeHelper.PRIMITIVE_LENGTHS.get(field.getClazz());
 							} else {
-								final Object newElement = getUnsafe().allocateInstance(field.getClazz());
+								Object newElement = null;
+								if (!getUnsafe().getBoolean(src, sOff + UnsafeHelper.BOOLEAN_FIELD_SIZE + UnsafeHelper.INT_FIELD_SIZE + i * subTypeLength)) {
+									newElement = getUnsafe().allocateInstance(field.getClazz());
+								}
 								Array.set(arr, i, newElement);
 								copyDest = newElement;
-								copyDestOffset = 0;
+								copySrcOffset = UnsafeHelper.BOOLEAN_FIELD_SIZE;
 							}
 							// arr[i]=field.getClazz().newInstance();
-							copyObject(field.getClazz(), direction, src, sOff + UnsafeHelper.INT_FIELD_SIZE + i * subTypeLength, copyDest, copyDestOffset);
+							if (copyDest != null) {
+								copyObject(field.getClazz(), direction, src,
+										sOff + UnsafeHelper.BOOLEAN_FIELD_SIZE + UnsafeHelper.INT_FIELD_SIZE + i * subTypeLength + copySrcOffset, copyDest,
+										copyDestOffset);
+							}
 						}
 						getUnsafe().putObject(dest, dOff, arr);
 					} else {
@@ -424,7 +443,15 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 					if (coll != null) {
 						int i = 0;
 						for (final Object copySrc : coll) {
-							copyObject(field.getClazz(), direction, copySrc, 0, dest, dOff + UnsafeHelper.INT_FIELD_SIZE + i * subTypeLength);
+							getUnsafe().putBoolean(dest, dOff + UnsafeHelper.BOOLEAN_FIELD_SIZE + UnsafeHelper.INT_FIELD_SIZE + i * subTypeLength,
+									copySrc == null);
+							if (copySrc != null) {
+								copyObject(field.getClazz(), direction, copySrc, 0, dest,
+										dOff + 2 * UnsafeHelper.BOOLEAN_FIELD_SIZE + UnsafeHelper.INT_FIELD_SIZE + i * subTypeLength);
+							} else {
+								getUnsafe().setMemory(dest, dOff + 2 * UnsafeHelper.BOOLEAN_FIELD_SIZE + UnsafeHelper.INT_FIELD_SIZE + i * subTypeLength,
+										subTypeLength - 1, (byte) 0);
+							}
 							i++;
 							if (i >= field.getElements()) {
 								break;
@@ -433,7 +460,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 					}
 					// pad with NULs
 					if (collLength < field.getElements()) {
-						getUnsafe().setMemory(dest, dOff + UnsafeHelper.INT_FIELD_SIZE + (collLength * subTypeLength),
+						getUnsafe().setMemory(dest, dOff + UnsafeHelper.BOOLEAN_FIELD_SIZE + UnsafeHelper.INT_FIELD_SIZE + (collLength * subTypeLength),
 								(field.getElements() * subTypeLength) - (collLength * subTypeLength), (byte) 0);
 					}
 				} else {
@@ -444,9 +471,14 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 						@SuppressWarnings("unchecked")
 						final Collection<Object> coll = (Collection<Object>) field.getCollectionClass().newInstance();
 						for (int i = 0; i < collLength; i++) {
-							final Object copyDest = getUnsafe().allocateInstance(field.getClazz());
-							copyObject(field.getClazz(), direction, src, sOff + UnsafeHelper.INT_FIELD_SIZE + i * subTypeLength, copyDest, 0);
-							coll.add(copyDest);
+							if (!getUnsafe().getBoolean(src, sOff + UnsafeHelper.BOOLEAN_FIELD_SIZE + UnsafeHelper.INT_FIELD_SIZE + i * subTypeLength)) {
+								final Object copyDest = getUnsafe().allocateInstance(field.getClazz());
+								copyObject(field.getClazz(), direction, src,
+										sOff + 2 * UnsafeHelper.BOOLEAN_FIELD_SIZE + UnsafeHelper.INT_FIELD_SIZE + i * subTypeLength, copyDest, 0);
+								coll.add(copyDest);
+							} else {
+								coll.add(null);
+							}
 						}
 						getUnsafe().putObject(dest, dOff, coll);
 					} else {
@@ -457,11 +489,20 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 			case OBJECT:
 				if (direction == Direction.SERIALIZE) {
 					final Object copySrc = getUnsafe().getObject(src, sOff);
-					copyObject(field.getClazz(), direction, copySrc, 0, dest, dOff);
+					getUnsafe().putBoolean(dest, dOff, copySrc == null);
+					if (copySrc != null) {
+						copyObject(field.getClazz(), direction, copySrc, 0, dest, dOff + UnsafeHelper.BOOLEAN_FIELD_SIZE);
+					} else {
+						getUnsafe().setMemory(dest, dOff + UnsafeHelper.BOOLEAN_FIELD_SIZE, this.classMetadata.get(field.getClazz()).getLength(), (byte) 0);
+					}
 				} else {
-					final Object copyDest = getUnsafe().allocateInstance(field.getClazz());
-					copyObject(field.getClazz(), direction, src, sOff, copyDest, 0);
-					getUnsafe().putObject(dest, dOff, copyDest);
+					if (!getUnsafe().getBoolean(src, sOff)) {
+						final Object copyDest = getUnsafe().allocateInstance(field.getClazz());
+						copyObject(field.getClazz(), direction, src, sOff + UnsafeHelper.BOOLEAN_FIELD_SIZE, copyDest, 0);
+						getUnsafe().putObject(dest, dOff, copyDest);
+					} else {
+						getUnsafe().putObject(dest, dOff, null);
+					}
 				}
 				break;
 			case ARRAY:
@@ -483,11 +524,11 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	}
 
 	private void writeFixedLength(final Integer length, final Object dest, final long dOff) {
-		getUnsafe().putInt(dest, dOff, length != null ? length : Integer.MIN_VALUE);
+		getUnsafe().putInt(dest, dOff + UnsafeHelper.BOOLEAN_FIELD_SIZE, length != null ? length : Integer.MIN_VALUE);
 	}
 
 	private Integer readFixedLength(final Object src, final long sOff) {
-		final int ret = getUnsafe().getInt(src, sOff);
+		final int ret = getUnsafe().getInt(src, sOff + UnsafeHelper.BOOLEAN_FIELD_SIZE);
 		return ret == Integer.MIN_VALUE ? null : ret;
 	}
 
