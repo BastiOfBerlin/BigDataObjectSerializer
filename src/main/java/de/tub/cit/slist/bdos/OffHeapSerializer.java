@@ -216,53 +216,58 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 							final FixedLength fixedLength = f.getAnnotation(FixedLength.class);
 							if (fixedLength != null) {
 								fieldMetadata.setType(FieldType.STRING_FIXED);
-								fieldLength = fixedLength.value() * UnsafeHelper.CHAR_FIELD_SIZE;
+								fieldLength = fixedLength.value() * UnsafeHelper.CHAR_FIELD_SIZE + UnsafeHelper.INT_FIELD_SIZE;
 								fieldMetadata.setElements(fixedLength.value());
-							} else
-								// TODO: variable-length String
-								throw new UnsupportedOperationException();
+							} else {
+								fieldMetadata.setType(FieldType.STRING);
+								fieldLength = UnsafeHelper.LONG_FIELD_SIZE;
+							}
 						} else if (classType.isArray()) {
+							final Class<?> subtype = classType.getComponentType();
+							if (subtype.isInterface()) throw new UnsupportedOperationException("No Interface Array allowed.");
+							fieldMetadata.setClazz(subtype);
+							final Map<Class<?>, ClassMetadata> subtypeMetadata = acquireClassMetadata(subtype, classMetadataMap);
+							addedClasses.putAll(subtypeMetadata);
+
 							final FixedLength fixedLength = f.getAnnotation(FixedLength.class);
 							if (fixedLength != null) {
 								fieldMetadata.setType(FieldType.ARRAY_FIXED);
-								final Class<?> subtype = classType.getComponentType();
-								if (subtype.isInterface()) throw new UnsupportedOperationException("No Interface Array allowed.");
-								fieldMetadata.setClazz(subtype);
 								fieldMetadata.setElements(fixedLength.value());
-								final Map<Class<?>, ClassMetadata> subtypeMetadata = acquireClassMetadata(subtype, classMetadataMap);
-								fieldLength = fixedLength.value() * classMetadataMap.get(subtype).getLength();
-								addedClasses.putAll(subtypeMetadata);
-							} else
-								// TODO: variable-length Array
-								throw new UnsupportedOperationException();
+								fieldLength = fixedLength.value() * classMetadataMap.get(subtype).getLength() + UnsafeHelper.INT_FIELD_SIZE;
+							} else {
+								fieldMetadata.setType(FieldType.ARRAY);
+								fieldLength = UnsafeHelper.LONG_FIELD_SIZE;
+							}
 						} else if (Collection.class.isAssignableFrom(classType)) {
+							if (classType.isInterface()) {
+								if (classType == List.class) {
+									// default implementation for Lists
+									fieldMetadata.setCollectionClass(ArrayList.class);
+								} else if (classType == Map.class) {
+									// default implementation for Maps
+									fieldMetadata.setCollectionClass(HashMap.class);
+								} else if (classType == Set.class) {
+									// default implementation for Sets
+									fieldMetadata.setCollectionClass(HashSet.class);
+								} else
+									throw new UnsupportedOperationException("Collection types must either be non-Interfaces, or of type List|Map|Set.");
+							} else {
+								fieldMetadata.setCollectionClass(classType);
+							}
+							final Class<?> subtype = (Class<?>) ((ParameterizedType) f.getGenericType()).getActualTypeArguments()[0];
+							fieldMetadata.setClazz(subtype);
+							final Map<Class<?>, ClassMetadata> subtypeMetadata = acquireClassMetadata(subtype, classMetadataMap);
+							addedClasses.putAll(subtypeMetadata);
+
 							final FixedLength fixedLength = f.getAnnotation(FixedLength.class);
 							if (fixedLength != null) {
 								fieldMetadata.setType(FieldType.COLLECTION_FIXED);
-								if (classType.isInterface()) {
-									if (classType == List.class) {
-										// default implementation for Lists
-										fieldMetadata.setCollectionClass(ArrayList.class);
-									} else if (classType == Map.class) {
-										// default implementation for Maps
-										fieldMetadata.setCollectionClass(HashMap.class);
-									} else if (classType == Set.class) {
-										// default implementation for Sets
-										fieldMetadata.setCollectionClass(HashSet.class);
-									} else
-										throw new UnsupportedOperationException("Collection types must either be non-Interfaces, or of type List|Map|Set.");
-								} else {
-									fieldMetadata.setCollectionClass(classType);
-								}
-								final Class<?> subtype = (Class<?>) ((ParameterizedType) f.getGenericType()).getActualTypeArguments()[0];
-								fieldMetadata.setClazz(subtype);
 								fieldMetadata.setElements(fixedLength.value());
-								final Map<Class<?>, ClassMetadata> subtypeMetadata = acquireClassMetadata(subtype, classMetadataMap);
-								fieldLength = fixedLength.value() * classMetadataMap.get(subtype).getLength();
-								addedClasses.putAll(subtypeMetadata);
-							} else
-								// TODO: variable-length Collection
-								throw new UnsupportedOperationException();
+								fieldLength = fixedLength.value() * classMetadataMap.get(subtype).getLength() + UnsafeHelper.INT_FIELD_SIZE;
+							} else {
+								fieldMetadata.setType(FieldType.COLLECTION_FIXED);
+								fieldLength = UnsafeHelper.LONG_FIELD_SIZE;
+							}
 						} else {
 							fieldMetadata.setType(FieldType.OBJECT);
 							final Map<Class<?>, ClassMetadata> subtypeMetadata = acquireClassMetadata(classType, classMetadataMap);
@@ -329,39 +334,46 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 			case STRING_FIXED:
 				if (direction == Direction.SERIALIZE) {
 					final String s = (String) getUnsafe().getObject(src, sOff);
-					final char[] arr = new char[Math.min(s.length(), field.getElements())];
-					s.getChars(0, arr.length, arr, 0);
-					for (int i = 0; i < arr.length; i++) {
-						// copyPrimitive(FieldType.CHAR, arr, Unsafe.ARRAY_CHAR_BASE_OFFSET + i * UnsafeHelper.CHAR_FIELD_SIZE, dest,
-						// dOff + i * UnsafeHelper.CHAR_FIELD_SIZE);
-						copyObject(char.class, direction, arr, Unsafe.ARRAY_CHAR_BASE_OFFSET + i * UnsafeHelper.CHAR_FIELD_SIZE, dest,
-								dOff + i * UnsafeHelper.CHAR_FIELD_SIZE);
+					final int stringLength = Math.min(s != null ? s.length() : 0, field.getElements());
+					writeFixedLength(s != null ? stringLength : null, dest, dOff);
+					if (s != null) {
+						final char[] arr = new char[stringLength];
+						s.getChars(0, arr.length, arr, 0);
+						for (int i = 0; i < arr.length; i++) {
+							// copyPrimitive(FieldType.CHAR, arr, Unsafe.ARRAY_CHAR_BASE_OFFSET + i * UnsafeHelper.CHAR_FIELD_SIZE, dest,
+							// dOff + i * UnsafeHelper.CHAR_FIELD_SIZE);
+							copyObject(char.class, direction, arr, Unsafe.ARRAY_CHAR_BASE_OFFSET + i * UnsafeHelper.CHAR_FIELD_SIZE, dest,
+									dOff + UnsafeHelper.INT_FIELD_SIZE + i * UnsafeHelper.CHAR_FIELD_SIZE);
+						}
 					}
 					// pad with NULs
-					if (arr.length < field.getElements()) {
-						getUnsafe().setMemory(dest, dOff + (arr.length * UnsafeHelper.CHAR_FIELD_SIZE),
-								(field.getElements() * UnsafeHelper.CHAR_FIELD_SIZE) - (arr.length * UnsafeHelper.CHAR_FIELD_SIZE), (byte) 0);
+					if (stringLength < field.getElements()) {
+						getUnsafe().setMemory(dest, dOff + UnsafeHelper.INT_FIELD_SIZE + (stringLength * UnsafeHelper.CHAR_FIELD_SIZE),
+								(field.getElements() * UnsafeHelper.CHAR_FIELD_SIZE) - (stringLength * UnsafeHelper.CHAR_FIELD_SIZE), (byte) 0);
 					}
 				} else {
-					final char[] arr = new char[field.getElements()];
-					for (int i = 0; i < arr.length; i++) {
-						if (getUnsafe().getChar(sOff + i * UnsafeHelper.CHAR_FIELD_SIZE) == (byte) 0) {
-							break;
+					final Integer stringLength = readFixedLength(src, sOff);
+					if (stringLength != null) {
+						final char[] arr = new char[stringLength];
+						for (int i = 0; i < stringLength; i++) {
+							// copyPrimitive(FieldType.CHAR, src, sOff + i * UnsafeHelper.CHAR_FIELD_SIZE, arr,
+							// Unsafe.ARRAY_CHAR_BASE_OFFSET + i * UnsafeHelper.CHAR_FIELD_SIZE);
+							copyObject(char.class, direction, src, sOff + UnsafeHelper.INT_FIELD_SIZE + i * UnsafeHelper.CHAR_FIELD_SIZE, arr,
+									Unsafe.ARRAY_CHAR_BASE_OFFSET + i * UnsafeHelper.CHAR_FIELD_SIZE);
 						}
-						// copyPrimitive(FieldType.CHAR, src, sOff + i * UnsafeHelper.CHAR_FIELD_SIZE, arr,
-						// Unsafe.ARRAY_CHAR_BASE_OFFSET + i * UnsafeHelper.CHAR_FIELD_SIZE);
-						copyObject(char.class, direction, src, sOff + i * UnsafeHelper.CHAR_FIELD_SIZE, arr,
-								Unsafe.ARRAY_CHAR_BASE_OFFSET + i * UnsafeHelper.CHAR_FIELD_SIZE);
+						getUnsafe().putObject(dest, dOff, String.valueOf(arr));
+					} else {
+						getUnsafe().putObject(dest, dOff, null);
 					}
-					getUnsafe().putObject(dest, dOff, String.valueOf(arr));
 				}
 				break;
 			case ARRAY_FIXED:
 				subTypeLength = this.classMetadata.get(field.getClazz()).getLength();
 				if (direction == Direction.SERIALIZE) {
 					final Object arr = getUnsafe().getObject(src, sOff);
-					final int arrLength = Array.getLength(arr);
-					for (int i = 0; i < Math.min(arrLength, field.getElements()); i++) {
+					final int arrLength = arr != null ? Math.min(Array.getLength(arr), field.getElements()) : 0;
+					writeFixedLength(arr != null ? arrLength : null, dest, dOff);
+					for (int i = 0; i < arrLength; i++) {
 						Object copySrc;
 						long copySrcOffset;
 						if (field.getClazz().isPrimitive()) {
@@ -371,62 +383,75 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 							copySrc = Array.get(arr, i);
 							copySrcOffset = 0;
 						}
-						copyObject(field.getClazz(), direction, copySrc, copySrcOffset, dest, dOff + i * subTypeLength);
+						copyObject(field.getClazz(), direction, copySrc, copySrcOffset, dest, dOff + UnsafeHelper.INT_FIELD_SIZE + i * subTypeLength);
 					}
 					// pad with NULs
 					if (arrLength < field.getElements()) {
-						getUnsafe().setMemory(dest, dOff + (arrLength * subTypeLength), (field.getElements() * subTypeLength) - (arrLength * subTypeLength),
-								(byte) 0);
+						getUnsafe().setMemory(dest, dOff + UnsafeHelper.INT_FIELD_SIZE + (arrLength * subTypeLength),
+								(field.getElements() * subTypeLength) - (arrLength * subTypeLength), (byte) 0);
 					}
 				} else {
-					final Object arr = Array.newInstance(field.getClazz(), field.getElements());
-					for (int i = 0; i < Array.getLength(arr); i++) {
-						Object copyDest;
-						long copyDestOffset;
-						if (field.getClazz().isPrimitive()) {
-							copyDest = arr;
-							copyDestOffset = Unsafe.ARRAY_OBJECT_BASE_OFFSET + i * UnsafeHelper.PRIMITIVE_LENGTHS.get(field.getClazz());
-						} else {
-							final Object newElement = getUnsafe().allocateInstance(field.getClazz());
-							Array.set(arr, i, newElement);
-							copyDest = newElement;
-							copyDestOffset = 0;
+					final Integer arrLength = readFixedLength(src, sOff);
+					if (arrLength != null) {
+						final Object arr = Array.newInstance(field.getClazz(), arrLength);
+						for (int i = 0; i < arrLength; i++) {
+							Object copyDest;
+							long copyDestOffset;
+							if (field.getClazz().isPrimitive()) {
+								copyDest = arr;
+								copyDestOffset = Unsafe.ARRAY_OBJECT_BASE_OFFSET + i * UnsafeHelper.PRIMITIVE_LENGTHS.get(field.getClazz());
+							} else {
+								final Object newElement = getUnsafe().allocateInstance(field.getClazz());
+								Array.set(arr, i, newElement);
+								copyDest = newElement;
+								copyDestOffset = 0;
+							}
+							// arr[i]=field.getClazz().newInstance();
+							copyObject(field.getClazz(), direction, src, sOff + UnsafeHelper.INT_FIELD_SIZE + i * subTypeLength, copyDest, copyDestOffset);
 						}
-						// arr[i]=field.getClazz().newInstance();
-						copyObject(field.getClazz(), direction, src, sOff + i * subTypeLength, copyDest, copyDestOffset);
+						getUnsafe().putObject(dest, dOff, arr);
+					} else {
+						getUnsafe().putObject(dest, dOff, null);
 					}
-					getUnsafe().putObject(dest, dOff, arr);
 				}
 				break;
 			case COLLECTION_FIXED:
 				subTypeLength = this.classMetadata.get(field.getClazz()).getLength();
 				if (direction == Direction.SERIALIZE) {
 					final Collection<?> coll = (Collection<?>) getUnsafe().getObject(src, sOff);
-					final int collLength = coll.size();
-					int i = 0;
-					for (final Object copySrc : coll) {
-						copyObject(field.getClazz(), direction, copySrc, 0, dest, dOff + i * subTypeLength);
-						i++;
-						if (i >= field.getElements()) {
-							break;
+					final int collLength = coll != null ? coll.size() : 0;
+					writeFixedLength(coll != null ? collLength : null, dest, dOff);
+					if (coll != null) {
+						int i = 0;
+						for (final Object copySrc : coll) {
+							copyObject(field.getClazz(), direction, copySrc, 0, dest, dOff + UnsafeHelper.INT_FIELD_SIZE + i * subTypeLength);
+							i++;
+							if (i >= field.getElements()) {
+								break;
+							}
 						}
 					}
 					// pad with NULs
 					if (collLength < field.getElements()) {
-						getUnsafe().setMemory(dest, dOff + (collLength * subTypeLength), (field.getElements() * subTypeLength) - (collLength * subTypeLength),
-								(byte) 0);
+						getUnsafe().setMemory(dest, dOff + UnsafeHelper.INT_FIELD_SIZE + (collLength * subTypeLength),
+								(field.getElements() * subTypeLength) - (collLength * subTypeLength), (byte) 0);
 					}
 				} else {
 					// TODO new Instance with number of elements?
 					// final Collection<Object> coll = (Collection<Object>) getUnsafe().allocateInstance(field.getCollectionClass());
-					@SuppressWarnings("unchecked")
-					final Collection<Object> coll = (Collection<Object>) field.getCollectionClass().newInstance();
-					for (int i = 0; i < field.getElements(); i++) {
-						final Object copyDest = getUnsafe().allocateInstance(field.getClazz());
-						copyObject(field.getClazz(), direction, src, sOff + i * subTypeLength, copyDest, 0);
-						coll.add(copyDest);
+					final Integer collLength = readFixedLength(src, sOff);
+					if (collLength != null) {
+						@SuppressWarnings("unchecked")
+						final Collection<Object> coll = (Collection<Object>) field.getCollectionClass().newInstance();
+						for (int i = 0; i < collLength; i++) {
+							final Object copyDest = getUnsafe().allocateInstance(field.getClazz());
+							copyObject(field.getClazz(), direction, src, sOff + UnsafeHelper.INT_FIELD_SIZE + i * subTypeLength, copyDest, 0);
+							coll.add(copyDest);
+						}
+						getUnsafe().putObject(dest, dOff, coll);
+					} else {
+						getUnsafe().putObject(dest, dOff, null);
 					}
-					getUnsafe().putObject(dest, dOff, coll);
 				}
 				break;
 			case OBJECT:
@@ -442,11 +467,28 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 			case ARRAY:
 			case STRING:
 			case COLLECTION:
+				if (direction == Direction.SERIALIZE) {
+					final Object copySrc = getUnsafe().getObject(src, sOff);
+					copyObjectDynamic(field.getClazz(), direction, copySrc, 0, dest, dOff);
+				} else {
+					final Object copyDest = getUnsafe().allocateInstance(field.getClazz());
+					copyObjectDynamic(field.getClazz(), direction, src, sOff, copyDest, 0);
+					getUnsafe().putObject(dest, dOff, copyDest);
+				}
 			default:
 				throw new UnsupportedOperationException();
 
 			}
 		}
+	}
+
+	private void writeFixedLength(final Integer length, final Object dest, final long dOff) {
+		getUnsafe().putInt(dest, dOff, length != null ? length : Integer.MIN_VALUE);
+	}
+
+	private Integer readFixedLength(final Object src, final long sOff) {
+		final int ret = getUnsafe().getInt(src, sOff);
+		return ret == Integer.MIN_VALUE ? null : ret;
 	}
 
 	private void copyObjectDynamic(final Class<?> baseclass, final Direction direction, final Object src, final long srcOffset, final Object dest,
@@ -949,9 +991,6 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	private class FreeBlockAddress {
 		long	address;
 		long	previousAddress	= -1;
-
-		FreeBlockAddress() {
-		}
 
 		FreeBlockAddress(final long address) {
 			this.address = address;
