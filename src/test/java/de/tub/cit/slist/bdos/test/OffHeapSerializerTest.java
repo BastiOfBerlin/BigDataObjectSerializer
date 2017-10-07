@@ -1,5 +1,6 @@
 package de.tub.cit.slist.bdos.test;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Random;
 
@@ -20,13 +21,15 @@ public class OffHeapSerializerTest {
 	private static final int	INSTANCES	= 2;
 	private static final Random	r			= new Random();
 
-	@Ignore
 	@Test
+	@Ignore
 	public void testSizeof() {
-		System.out.println("Header size:      " + UnsafeHelper.headerSize(PrimitiveClass.class));
-		System.out.println("firstFieldOffset: " + UnsafeHelper.firstFieldOffset(PrimitiveClass.class));
-		System.out.println("Size of fields:   " + UnsafeHelper.sizeOfFields(PrimitiveClass.class));
-		System.out.println("Size Of:          " + UnsafeHelper.sizeOf(PrimitiveClass.class));
+		System.out.println("Header size:                    " + UnsafeHelper.headerSize(PrimitiveClass.class));
+		System.out.println("firstFieldOffset:               " + UnsafeHelper.firstFieldOffset(PrimitiveClass.class));
+		System.out.println("Size of fields Primitive Class: " + UnsafeHelper.sizeOfFields(PrimitiveClass.class));
+		System.out.println("Size Of PrimitiveClass:         " + UnsafeHelper.sizeOf(PrimitiveClass.class));
+		System.out.println("Size Of FixedLengthClass:       " + UnsafeHelper.sizeOf(FixedLengthClass.class));
+		System.out.println("Size Of GenericClass:           " + UnsafeHelper.sizeOf(GenericClass.class));
 	}
 
 	@Test
@@ -149,7 +152,6 @@ public class OffHeapSerializerTest {
 	}
 
 	@Test
-	@Ignore
 	public void testFixedLengthEmpty() throws InstantiationException, IllegalAccessException {
 		OffHeapSerializer<FixedLengthClass> serializer = null;
 		try {
@@ -158,6 +160,29 @@ public class OffHeapSerializerTest {
 			for (int i = 0; i < INSTANCES; i++) {
 				final FixedLengthClass instance = new FixedLengthClass();
 				instance.setFixedString("");
+				instance.setFixedIntArray(new int[0]);
+				instance.setFixedIntegerArray(new Integer[0]);
+				instance.setFixedIntegerList(new ArrayList<>(0));
+				ref[i] = instance;
+				serializer.setRandomAccess(i, instance);
+			}
+			assertEquals(serializer, ref);
+		} finally {
+			if (serializer != null) {
+				serializer.destroy();
+			}
+		}
+	}
+
+	@Test
+	public void testFixedLengthNullElements() {
+		OffHeapSerializer<FixedLengthClass> serializer = null;
+		try {
+			serializer = new OffHeapSerializer<>(FixedLengthClass.class, (new ConfigFactory()).withSize(INSTANCES).build(), 0);
+			final FixedLengthClass[] ref = new FixedLengthClass[INSTANCES];
+			for (int i = 0; i < INSTANCES; i++) {
+				final FixedLengthClass instance = new FixedLengthClass();
+				instance.getFixedIntegerList().add(null);
 				ref[i] = instance;
 				serializer.setRandomAccess(i, instance);
 			}
@@ -198,6 +223,25 @@ public class OffHeapSerializerTest {
 		try {
 			serializer = new OffHeapSerializer<>(GenericClass.class, (new ConfigFactory()).withSize(INSTANCES).build(), 0);
 			setAndGet(serializer, GenericClass.class);
+		} finally {
+			if (serializer != null) {
+				serializer.destroy();
+			}
+		}
+	}
+
+	@Test
+	public void testGenericClassNullFields() {
+		OffHeapSerializer<GenericClass> serializer = null;
+		try {
+			serializer = new OffHeapSerializer<>(GenericClass.class, (new ConfigFactory()).withSize(INSTANCES).build(), 0);
+			final GenericClass[] ref = new GenericClass[INSTANCES];
+			for (int i = 0; i < INSTANCES; i++) {
+				final GenericClass instance = new GenericClass();
+				ref[i] = instance;
+				serializer.setRandomAccess(i, instance);
+			}
+			assertEquals(serializer, ref);
 		} finally {
 			if (serializer != null) {
 				serializer.destroy();
