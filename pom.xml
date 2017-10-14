@@ -39,7 +39,8 @@
 					<artifactId>maven-surefire-plugin</artifactId>
 					<version>2.19.1</version>
 					<configuration>
-						<!-- auf true setzen, wenn kein Abbruch bei Testfehlern gewuenscht ist -->
+						<!-- auf true setzen, wenn kein Abbruch bei Testfehlern gewuenscht 
+							ist -->
 						<testFailureIgnore>false</testFailureIgnore>
 						<argLine>${surefireArgLine}</argLine>
 					</configuration>
