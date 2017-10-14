@@ -21,3 +21,5 @@ deploy:
     tags: true
 addons:
 #  srcclr: true
+  sonarcloud:
+      organization: "bastiofberlin-github"
