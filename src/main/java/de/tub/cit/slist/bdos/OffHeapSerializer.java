@@ -188,16 +188,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 					final String s = (String) getUnsafe().getObject(src, sOff);
 					final int stringLength = Math.min(s != null ? s.length() : 0, field.getElements());
 					writeFixedLength(s != null ? stringLength : null, dest, dOff);
-					if (s != null) {
-						final char[] arr = new char[stringLength];
-						s.getChars(0, stringLength, arr, 0);
-						for (int i = 0; i < stringLength; i++) {
-							// copyPrimitive(FieldType.CHAR, arr, Unsafe.ARRAY_CHAR_BASE_OFFSET + i * UnsafeHelper.CHAR_FIELD_SIZE, dest,
-							// dOff + i * UnsafeHelper.CHAR_FIELD_SIZE);
-							copyObject(char.class, direction, arr, Unsafe.ARRAY_CHAR_BASE_OFFSET + i * UnsafeHelper.CHAR_FIELD_SIZE, dest,
-									dOff + UnsafeHelper.BOOLEAN_FIELD_SIZE + UnsafeHelper.INT_FIELD_SIZE + i * UnsafeHelper.CHAR_FIELD_SIZE);
-						}
-					}
+					writeString(dest, dOff, s, stringLength);
 					// pad with NULs
 					if (stringLength < field.getElements()) {
 						getUnsafe().setMemory(dest,
@@ -206,19 +197,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 					}
 				} else {
 					final Integer stringLength = readFixedLength(src, sOff);
-					if (stringLength != null) {
-						final char[] arr = new char[stringLength];
-						for (int i = 0; i < stringLength; i++) {
-							// copyPrimitive(FieldType.CHAR, src, sOff + i * UnsafeHelper.CHAR_FIELD_SIZE, arr,
-							// Unsafe.ARRAY_CHAR_BASE_OFFSET + i * UnsafeHelper.CHAR_FIELD_SIZE);
-							copyObject(char.class, direction, src,
-									sOff + UnsafeHelper.BOOLEAN_FIELD_SIZE + UnsafeHelper.INT_FIELD_SIZE + i * UnsafeHelper.CHAR_FIELD_SIZE, arr,
-									Unsafe.ARRAY_CHAR_BASE_OFFSET + i * UnsafeHelper.CHAR_FIELD_SIZE);
-						}
-						getUnsafe().putObject(dest, dOff, String.valueOf(arr));
-					} else {
-						getUnsafe().putObject(dest, dOff, null);
-					}
+					getUnsafe().putObject(dest, dOff, readString(src, sOff, stringLength));
 				}
 				break;
 			case ARRAY_FIXED:
@@ -374,10 +353,67 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 		}
 	}
 
+	/**
+	 * Writes <code>stringLength</code> characters of a String.
+	 *
+	 * @param dest
+	 * @param dOff
+	 * @param s
+	 * @param stringLength
+	 * @throws InstantiationException
+	 * @throws IllegalAccessException
+	 */
+	private void writeString(final Object dest, final long dOff, final String s, final int stringLength) throws InstantiationException, IllegalAccessException {
+		if (s != null) {
+			final char[] arr = new char[stringLength];
+			s.getChars(0, stringLength, arr, 0);
+			for (int i = 0; i < stringLength; i++) {
+				copyObject(char.class, Direction.SERIALIZE, arr, Unsafe.ARRAY_CHAR_BASE_OFFSET + i * UnsafeHelper.CHAR_FIELD_SIZE, dest,
+						dOff + UnsafeHelper.BOOLEAN_FIELD_SIZE + UnsafeHelper.INT_FIELD_SIZE + i * UnsafeHelper.CHAR_FIELD_SIZE);
+			}
+		}
+	}
+
+	/**
+	 * Reads a String with a length of <code>stringLength</code>.
+	 *
+	 * @param src
+	 * @param sOff
+	 * @param stringLength
+	 * @return The String or <code>NULL</code> if the length is <code>NULL</code>
+	 * @throws InstantiationException
+	 * @throws IllegalAccessException
+	 */
+	private String readString(final Object src, final long sOff, final Integer stringLength) throws InstantiationException, IllegalAccessException {
+		if (stringLength == null) return null;
+		final char[] arr = new char[stringLength];
+		for (int i = 0; i < stringLength; i++) {
+			copyObject(char.class, Direction.DESERIALIZE, src,
+					sOff + UnsafeHelper.BOOLEAN_FIELD_SIZE + UnsafeHelper.INT_FIELD_SIZE + i * UnsafeHelper.CHAR_FIELD_SIZE, arr,
+					Unsafe.ARRAY_CHAR_BASE_OFFSET + i * UnsafeHelper.CHAR_FIELD_SIZE);
+		}
+		return String.valueOf(arr);
+	}
+
+	/**
+	 * Writes the length of a {@link de.tub.cit.slist.bdos.annotation.FixedLength FixedLength} String|Array|Collection or {@link Integer#MIN_VALUE} iff length
+	 * is <code>NULL</code>.
+	 *
+	 * @param length
+	 * @param dest
+	 * @param dOff
+	 */
 	private void writeFixedLength(final Integer length, final Object dest, final long dOff) {
 		getUnsafe().putInt(dest, dOff + UnsafeHelper.BOOLEAN_FIELD_SIZE, length != null ? length : Integer.MIN_VALUE);
 	}
 
+	/**
+	 * Gets the length of a {@link de.tub.cit.slist.bdos.annotation.FixedLength FixedLength} String|Array|Collection.
+	 *
+	 * @param src
+	 * @param sOff
+	 * @return lenth or <code>NULL</code> iff value is {@link Integer#MIN_VALUE}.
+	 */
 	private Integer readFixedLength(final Object src, final long sOff) {
 		final int ret = getUnsafe().getInt(src, sOff + UnsafeHelper.BOOLEAN_FIELD_SIZE);
 		return ret == Integer.MIN_VALUE ? null : ret;
