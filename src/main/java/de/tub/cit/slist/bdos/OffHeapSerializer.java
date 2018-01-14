@@ -188,7 +188,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 					final String s = (String) getUnsafe().getObject(src, sOff);
 					final int stringLength = Math.min(s != null ? s.length() : 0, field.getElements());
 					writeFixedLength(s != null ? stringLength : null, dest, dOff);
-					writeString(dest, dOff, s, stringLength);
+					writeString(dest, dOff + UnsafeHelper.BOOLEAN_FIELD_SIZE + UnsafeHelper.INT_FIELD_SIZE, s, stringLength);
 					// pad with NULs
 					if (stringLength < field.getElements()) {
 						getUnsafe().setMemory(dest,
@@ -197,7 +197,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 					}
 				} else {
 					final Integer stringLength = readFixedLength(src, sOff);
-					getUnsafe().putObject(dest, dOff, readString(src, sOff, stringLength));
+					getUnsafe().putObject(dest, dOff, readString(src, sOff + UnsafeHelper.BOOLEAN_FIELD_SIZE + UnsafeHelper.INT_FIELD_SIZE, stringLength));
 				}
 				break;
 			case ARRAY_FIXED:
@@ -339,13 +339,16 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 			case STRING:
 			case COLLECTION:
 				if (direction == Direction.SERIALIZE) {
-					final Object copySrc = getUnsafe().getObject(src, sOff);
-					copyObjectDynamic(field.getClazz(), direction, copySrc, 0, dest, dOff);
+					try {
+						writeDynamicField(field, src, sOff, dest, dOff);
+					} catch (final OutOfDynamicMemoryException e) {
+						// TODO reset
+						throw e;
+					}
 				} else {
-					final Object copyDest = getUnsafe().allocateInstance(field.getClazz());
-					copyObjectDynamic(field.getClazz(), direction, src, sOff, copyDest, 0);
-					getUnsafe().putObject(dest, dOff, copyDest);
+					readDynamicField(field, src, sOff, dest, dOff);
 				}
+				break;
 			default:
 				throw new UnsupportedOperationException();
 
@@ -369,7 +372,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 			s.getChars(0, stringLength, arr, 0);
 			for (int i = 0; i < stringLength; i++) {
 				copyObject(char.class, Direction.SERIALIZE, arr, Unsafe.ARRAY_CHAR_BASE_OFFSET + i * UnsafeHelper.CHAR_FIELD_SIZE, dest,
-						dOff + UnsafeHelper.BOOLEAN_FIELD_SIZE + UnsafeHelper.INT_FIELD_SIZE + i * UnsafeHelper.CHAR_FIELD_SIZE);
+						dOff + i * UnsafeHelper.CHAR_FIELD_SIZE);
 			}
 		}
 	}
@@ -388,8 +391,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 		if (stringLength == null) return null;
 		final char[] arr = new char[stringLength];
 		for (int i = 0; i < stringLength; i++) {
-			copyObject(char.class, Direction.DESERIALIZE, src,
-					sOff + UnsafeHelper.BOOLEAN_FIELD_SIZE + UnsafeHelper.INT_FIELD_SIZE + i * UnsafeHelper.CHAR_FIELD_SIZE, arr,
+			copyObject(char.class, Direction.DESERIALIZE, src, sOff + i * UnsafeHelper.CHAR_FIELD_SIZE, arr,
 					Unsafe.ARRAY_CHAR_BASE_OFFSET + i * UnsafeHelper.CHAR_FIELD_SIZE);
 		}
 		return String.valueOf(arr);
@@ -419,13 +421,81 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 		return ret == Integer.MIN_VALUE ? null : ret;
 	}
 
-	private void copyObjectDynamic(final Class<?> baseclass, final Direction direction, final Object src, final long srcOffset, final Object dest,
-			final long destOffset) {
-		// TODO
-		if (direction == Direction.SERIALIZE) {
+	private void writeDynamicField(final FieldMetadata field, final Object src, final long sOff, final Object dest, final long dOff)
+			throws OutOfDynamicMemoryException, InstantiationException, IllegalAccessException {
+		final Object copySrc = getUnsafe().getObject(src, sOff);
+		final boolean isNull = copySrc == null;
+		getUnsafe().putBoolean(dest, dOff, isNull);
+		if (isNull) {
+			getUnsafe().putLong(dest, dOff, Long.MIN_VALUE);
+		}
+		long addr = getUnsafe().getLong(dest, dOff + UnsafeHelper.BOOLEAN_FIELD_SIZE);
+		if (isNull && addr > 0) {
+			deallocateDynamicMemory(addr);
+			return;
+		}
 
+		switch (field.getType()) {
+		case STRING:
+			final String s = (String) copySrc;
+			final int payloadLength = s.length();
+			if (addr > 0 && getUnsafe().getLong(backingArray, addr) != payloadLength) {
+				deallocateDynamicMemory(addr);
+				addr = Long.MIN_VALUE;
+			}
+			if (addr <= 0) {
+				addr = allocateDynamicMemory(payloadLength * UnsafeHelper.CHAR_FIELD_SIZE);
+			}
+			writeString(backingArray, addr + UnsafeHelper.LONG_FIELD_SIZE, s, payloadLength);
+			getUnsafe().putLong(dest, dOff + UnsafeHelper.BOOLEAN_FIELD_SIZE, addr);
+			break;
+		case ARRAY:
+		case COLLECTION:
+		default:
+			throw new UnsupportedOperationException();
+		}
+		/*
+		 * TODO
+		 * source is null && destination hat adresse? -> löschen und return
+		 * länge ermitteln
+		 * destination hat adresse:
+		 * länge identisch? -> adresse übernehmen
+		 * sonst löschen
+		 * keine adresse? -> speicher allozieren
+		 * nicht genug platz? -> exception
+		 * feld an adresse schreiben
+		 * adresse in destination schreiben
+		 */
+	}
+
+	private void readDynamicField(final FieldMetadata field, final Object src, final long sOff, final Object dest, final long dOff)
+			throws InstantiationException, IllegalAccessException {
+		if (!getUnsafe().getBoolean(src, sOff)) {
+			Object copyDest = null;
+			switch (field.getType()) {
+			case STRING:
+				final long addr = getUnsafe().getLong(src, sOff + UnsafeHelper.BOOLEAN_FIELD_SIZE);
+				if (addr >= 0) {
+					final long size = getUnsafe().getLong(backingArray, addr);
+					final Integer payloadLength = Long.MIN_VALUE == size ? null : (int) size / UnsafeHelper.CHAR_FIELD_SIZE;
+					copyDest = readString(backingArray, addr + UnsafeHelper.LONG_FIELD_SIZE, payloadLength);
+				}
+				break;
+			case ARRAY:
+				// final Object copyDest = getUnsafe().allocateInstance(field.getClazz());
+			case COLLECTION:
+			default:
+				throw new UnsupportedOperationException();
+			}
+			/*
+			 * TODO
+			 * adresse ermitteln
+			 * länge ermitteln
+			 * feld lesen
+			 */
+			getUnsafe().putObject(dest, dOff, copyDest);
 		} else {
-
+			getUnsafe().putObject(dest, dOff, null);
 		}
 	}
 
@@ -634,7 +704,6 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	public void setRandomAccess(final long idx, final T element) {
 		checkIndexBounds(idx);
 		if (element != null) {
-			// getUnsafe().copyMemory(element, firstFieldOffset, backingArray, offset(idx), elementSize);
 			try {
 				copyObject(baseClass, Direction.SERIALIZE, element, 0, backingArray, offset(idx));
 				setNull(idx, false);
@@ -642,6 +711,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 				throw new UndeclaredThrowableException(e);
 			}
 		} else {
+			// TODO: delete dynamic length fields
 			getUnsafe().setMemory(offset(idx), elementSize, (byte) 0);
 			setNull(idx, true);
 		}
@@ -678,7 +748,6 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	public T getRandomAccess(final T dest, final long idx) {
 		checkIndexBounds(idx);
 		if (isNull(idx)) return null;
-		// UnsafeHelper.copyMemory(backingArray, offset(idx), dest, firstFieldOffset, elementSize);
 		try {
 			copyObject(baseClass, Direction.DESERIALIZE, backingArray, offset(idx), dest, 0);
 		} catch (final InstantiationException | IllegalAccessException e) {

@@ -12,6 +12,7 @@ import de.tub.cit.slist.bdos.OffHeapSerializer;
 import de.tub.cit.slist.bdos.conf.ConfigFactory;
 import de.tub.cit.slist.bdos.conf.MemoryLocation;
 import de.tub.cit.slist.bdos.exception.OutOfDynamicMemoryException;
+import de.tub.cit.slist.bdos.test.classes.DynamicLengthClass;
 import de.tub.cit.slist.bdos.test.classes.FixedLengthClass;
 import de.tub.cit.slist.bdos.test.classes.GenericClass;
 import de.tub.cit.slist.bdos.test.classes.PrimitiveClass;
@@ -250,4 +251,16 @@ public class OffHeapSerializerTest {
 		}
 	}
 
+	@Test
+	public void testDynamicLength() throws Exception {
+		OffHeapSerializer<DynamicLengthClass> serializer = null;
+		try {
+			serializer = new OffHeapSerializer<>(DynamicLengthClass.class, (new ConfigFactory()).withSize(INSTANCES).withDynamicRatio(0.8).build(), 0);
+			setAndGet(serializer, DynamicLengthClass.class);
+		} finally {
+			if (serializer != null) {
+				serializer.destroy();
+			}
+		}
+	}
 }
