@@ -11,6 +11,7 @@ import org.junit.Test;
 import de.tub.cit.slist.bdos.OffHeapSerializer;
 import de.tub.cit.slist.bdos.conf.ConfigFactory;
 import de.tub.cit.slist.bdos.conf.MemoryLocation;
+import de.tub.cit.slist.bdos.exception.OutOfDynamicMemoryException;
 import de.tub.cit.slist.bdos.test.classes.FixedLengthClass;
 import de.tub.cit.slist.bdos.test.classes.GenericClass;
 import de.tub.cit.slist.bdos.test.classes.PrimitiveClass;
@@ -33,7 +34,7 @@ public class OffHeapSerializerTest {
 	}
 
 	@Test
-	public void testSetGetNative() throws InstantiationException, IllegalAccessException {
+	public void testSetGetNative() throws Exception {
 		OffHeapSerializer<PrimitiveClass> serializer = null;
 		try {
 			serializer = new OffHeapSerializer<>(PrimitiveClass.class, (new ConfigFactory()).withSize(INSTANCES).build(), 0);
@@ -46,7 +47,7 @@ public class OffHeapSerializerTest {
 	}
 
 	@Test
-	public void testSetGetByteArray() throws InstantiationException, IllegalAccessException {
+	public void testSetGetByteArray() throws Exception {
 		OffHeapSerializer<PrimitiveClass> serializer = null;
 		try {
 			serializer = new OffHeapSerializer<>(PrimitiveClass.class,
@@ -60,7 +61,7 @@ public class OffHeapSerializerTest {
 	}
 
 	private <T extends RandomlyInitializable> void setAndGet(final OffHeapSerializer<T> serializer, final Class<T> clazz)
-			throws InstantiationException, IllegalAccessException {
+			throws InstantiationException, IllegalAccessException, OutOfDynamicMemoryException {
 		final RandomlyInitializable[] ref = new RandomlyInitializable[INSTANCES];
 		for (int i = 0; i < INSTANCES; i++) {
 			final T instance = clazz.newInstance();
@@ -78,13 +79,13 @@ public class OffHeapSerializerTest {
 	}
 
 	@Test(expected = IndexOutOfBoundsException.class)
-	public void testIndexOutOfBoundsException() {
+	public void testIndexOutOfBoundsException() throws Exception {
 		final OffHeapSerializer<PrimitiveClass> serializer = new OffHeapSerializer<>(PrimitiveClass.class, (new ConfigFactory()).withSize(1).build(), 0);
 		serializer.setRandomAccess(1, new PrimitiveClass(r));
 	}
 
 	@Test
-	public void testGetNull() {
+	public void testGetNull() throws Exception {
 		final OffHeapSerializer<PrimitiveClass> serializer = new OffHeapSerializer<>(PrimitiveClass.class, (new ConfigFactory()).withSize(1).build(), 0);
 		Assert.assertNull(serializer.getRandomAccess(0));
 		Assert.assertTrue(serializer.isNull(0));
@@ -114,7 +115,7 @@ public class OffHeapSerializerTest {
 	}
 
 	@Test
-	public void testFixedLength() throws InstantiationException, IllegalAccessException {
+	public void testFixedLength() throws Exception {
 		OffHeapSerializer<FixedLengthClass> serializer = null;
 		try {
 			serializer = new OffHeapSerializer<>(FixedLengthClass.class, (new ConfigFactory()).withSize(INSTANCES).build(), 0);
@@ -127,7 +128,7 @@ public class OffHeapSerializerTest {
 	}
 
 	@Test
-	public void testFixedLengthWithLessElements() throws InstantiationException, IllegalAccessException {
+	public void testFixedLengthWithLessElements() throws Exception {
 		OffHeapSerializer<FixedLengthClass> serializer = null;
 		try {
 			serializer = new OffHeapSerializer<>(FixedLengthClass.class, (new ConfigFactory()).withSize(INSTANCES).build(), 0);
@@ -152,7 +153,7 @@ public class OffHeapSerializerTest {
 	}
 
 	@Test
-	public void testFixedLengthEmpty() throws InstantiationException, IllegalAccessException {
+	public void testFixedLengthEmpty() throws Exception {
 		OffHeapSerializer<FixedLengthClass> serializer = null;
 		try {
 			serializer = new OffHeapSerializer<>(FixedLengthClass.class, (new ConfigFactory()).withSize(INSTANCES).build(), 0);
@@ -175,7 +176,7 @@ public class OffHeapSerializerTest {
 	}
 
 	@Test
-	public void testFixedLengthNullElements() {
+	public void testFixedLengthNullElements() throws Exception {
 		OffHeapSerializer<FixedLengthClass> serializer = null;
 		try {
 			serializer = new OffHeapSerializer<>(FixedLengthClass.class, (new ConfigFactory()).withSize(INSTANCES).build(), 0);
@@ -195,7 +196,7 @@ public class OffHeapSerializerTest {
 	}
 
 	@Test
-	public void testFixedLengthNull() throws InstantiationException, IllegalAccessException {
+	public void testFixedLengthNull() throws Exception {
 		OffHeapSerializer<FixedLengthClass> serializer = null;
 		try {
 			serializer = new OffHeapSerializer<>(FixedLengthClass.class, (new ConfigFactory()).withSize(INSTANCES).build(), 0);
@@ -218,7 +219,7 @@ public class OffHeapSerializerTest {
 	}
 
 	@Test
-	public void testGenericClass() throws InstantiationException, IllegalAccessException {
+	public void testGenericClass() throws Exception {
 		OffHeapSerializer<GenericClass> serializer = null;
 		try {
 			serializer = new OffHeapSerializer<>(GenericClass.class, (new ConfigFactory()).withSize(INSTANCES).build(), 0);
@@ -231,7 +232,7 @@ public class OffHeapSerializerTest {
 	}
 
 	@Test
-	public void testGenericClassNullFields() {
+	public void testGenericClassNullFields() throws Exception {
 		OffHeapSerializer<GenericClass> serializer = null;
 		try {
 			serializer = new OffHeapSerializer<>(GenericClass.class, (new ConfigFactory()).withSize(INSTANCES).build(), 0);

@@ -1,6 +1,6 @@
 package de.tub.cit.slist.bdos.exception;
 
-public class OutOfDynamicMemoryException extends Exception {
+public class OutOfDynamicMemoryException extends RuntimeException {
 
 	private static final long serialVersionUID = -2042481746011731247L;
 

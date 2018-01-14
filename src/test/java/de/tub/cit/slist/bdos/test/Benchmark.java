@@ -49,7 +49,7 @@ public class Benchmark {
 	}
 
 	@Test
-	public void randomSetGet() {
+	public void randomSetGet() throws Exception {
 		final long fillOffHeapTime = fill(offHeapSerializer);
 		System.out.format("Time for fill (off-heap):\t\t%,7dms\n", fillOffHeapTime);
 		final long fillOnHeapTime = fill(byteArraySerializer);
@@ -71,7 +71,7 @@ public class Benchmark {
 		System.out.format("Reads preallocated  (on-heap):\t%#,14.2f per second\n", (INSTANCES / (double) readOnHeapPreallocated * 1000));
 	}
 
-	private long fill(final OffHeapSerializer<PrimitiveClass> serializer) {
+	private long fill(final OffHeapSerializer<PrimitiveClass> serializer) throws Exception {
 		long start, end;
 		start = System.currentTimeMillis();
 		for (int i = 0; i < INSTANCES; i++) {
