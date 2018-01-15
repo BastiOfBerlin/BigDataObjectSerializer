@@ -933,6 +933,7 @@ public class BigDataLinkedList<T extends Serializable> extends AbstractSequentia
 
 		@Override
 		public T next() {
+			if (!itr.hasNext()) throw new NoSuchElementException();
 			return itr.previous();
 		}
 

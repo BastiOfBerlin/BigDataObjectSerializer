@@ -211,7 +211,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 						long copySrcOffset = 0, copyDestOffset = 0;
 						if (field.getClazz().isPrimitive()) {
 							copySrc = arr;
-							copySrcOffset = Unsafe.ARRAY_OBJECT_BASE_OFFSET + i * UnsafeHelper.PRIMITIVE_LENGTHS.get(field.getClazz());
+							copySrcOffset = Unsafe.ARRAY_OBJECT_BASE_OFFSET + i * UnsafeHelper.getPrimitiveLengths().get(field.getClazz());
 						} else {
 							copySrc = Array.get(arr, i);
 							getUnsafe().putBoolean(dest, dOff + UnsafeHelper.BOOLEAN_FIELD_SIZE + UnsafeHelper.INT_FIELD_SIZE + i * subTypeLength,
@@ -241,7 +241,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 							long copySrcOffset = 0, copyDestOffset = 0;
 							if (field.getClazz().isPrimitive()) {
 								copyDest = arr;
-								copyDestOffset = Unsafe.ARRAY_OBJECT_BASE_OFFSET + i * UnsafeHelper.PRIMITIVE_LENGTHS.get(field.getClazz());
+								copyDestOffset = Unsafe.ARRAY_OBJECT_BASE_OFFSET + i * UnsafeHelper.getPrimitiveLengths().get(field.getClazz());
 							} else {
 								Object newElement = null;
 								if (!getUnsafe().getBoolean(src, sOff + UnsafeHelper.BOOLEAN_FIELD_SIZE + UnsafeHelper.INT_FIELD_SIZE + i * subTypeLength)) {

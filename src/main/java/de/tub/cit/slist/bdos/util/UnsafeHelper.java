@@ -22,7 +22,7 @@ public class UnsafeHelper {
 	public static final int	DOUBLE_FIELD_SIZE	= 8;
 	public static final int	FLOAT_FIELD_SIZE	= 4;
 
-	public static final Map<Class<?>, Integer> PRIMITIVE_LENGTHS = new HashMap<>();
+	protected static final Map<Class<?>, Integer> PRIMITIVE_LENGTHS = new HashMap<>();
 	static {
 		PRIMITIVE_LENGTHS.put(Boolean.TYPE, BOOLEAN_FIELD_SIZE);
 		PRIMITIVE_LENGTHS.put(Byte.TYPE, Byte.BYTES);
@@ -32,6 +32,9 @@ public class UnsafeHelper {
 		PRIMITIVE_LENGTHS.put(Integer.TYPE, Integer.BYTES);
 		PRIMITIVE_LENGTHS.put(Long.TYPE, Long.BYTES);
 		PRIMITIVE_LENGTHS.put(Short.TYPE, Short.BYTES);
+	}
+
+	private UnsafeHelper() {
 	}
 
 	/** the unsafe */
@@ -307,5 +310,9 @@ public class UnsafeHelper {
 		} catch (final UnsupportedEncodingException e) {
 			throw new UndeclaredThrowableException(e);
 		}
+	}
+
+	public static Map<Class<?>, Integer> getPrimitiveLengths() {
+		return PRIMITIVE_LENGTHS;
 	}
 }
