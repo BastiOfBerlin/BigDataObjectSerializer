@@ -52,12 +52,8 @@ public class UnsafeHelper {
 				field = Unsafe.class.getDeclaredField("theUnsafe");
 				field.setAccessible(true);
 				return (Unsafe) field.get(null);
-			} catch (SecurityException | IllegalAccessException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
 			} catch (final Exception e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+				throw new AssertionError(e);
 			}
 		}
 		return unsafe;
@@ -74,7 +70,6 @@ public class UnsafeHelper {
 	 */
 	public static long toAddress(final Object obj) {
 		final Object[] array = new Object[] { obj };
-		// return normalize(getUnsafe().getInt(array, (long) Unsafe.ARRAY_OBJECT_BASE_OFFSET));
 		return getUnsafe().getLong(array, (long) Unsafe.ARRAY_OBJECT_BASE_OFFSET);
 	}
 
@@ -170,7 +165,7 @@ public class UnsafeHelper {
 	public static long headerSize(final Class<?> clazz) {
 		if (clazz == null) throw new NullPointerException();
 		// TODO Should be calculated based on the platform
-		// TODO maybe unsafe.addressSize() would help? but returns 8 for compressed pointers off..
+		// maybe unsafe.addressSize() would help? but returns 8 for compressed pointers off..
 		// JVM_64 has a 12 byte header 8 + 4 (with compressed pointers on)
 		long len = (long) OBJECT_SHELL_SIZE + OBJREF_SIZE;
 		if (clazz.isArray()) {
