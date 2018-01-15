@@ -7,10 +7,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Configuration class for the Off-Heap Serializer. Instances can be obtained by using the {@link ConfigFactory}.
  */
 public class OHSConfig implements java.io.Serializable {
+	final transient Logger logger = LoggerFactory.getLogger(OHSConfig.class);
 
 	private static final long	serialVersionUID	= 6112706157710557887L;
 	private static final String	RESOURCE_NAME		= "config/serializer.properties";
@@ -36,7 +40,6 @@ public class OHSConfig implements java.io.Serializable {
 	 */
 	OHSConfig() {
 		properties = new Properties(defaults);
-		// loadDefaultsFromFile();
 	}
 
 	/**
@@ -46,8 +49,7 @@ public class OHSConfig implements java.io.Serializable {
 		try {
 			loadPropertiesFromStream(this.getClass().getClassLoader().getResourceAsStream(RESOURCE_NAME));
 		} catch (final IOException e) {
-			// TODO log exception
-			e.printStackTrace();
+			logger.warn("Could not read from file: {}", e.getMessage());
 		}
 	}
 
@@ -55,10 +57,9 @@ public class OHSConfig implements java.io.Serializable {
 	 * loads properties from a file f.
 	 *
 	 * @param f {@link File}
-	 * @throws FileNotFoundException
 	 * @throws IOException
 	 */
-	void loadPropertiesFromFile(final File f) throws FileNotFoundException, IOException {
+	void loadPropertiesFromFile(final File f) throws IOException {
 		loadPropertiesFromStream(new FileInputStream(f));
 	}
 

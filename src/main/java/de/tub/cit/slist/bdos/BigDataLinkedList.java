@@ -394,7 +394,8 @@ public class BigDataLinkedList<T extends Serializable> extends AbstractSequentia
 		final int numNew = a.length;
 		if (numNew == 0) return false;
 
-		int pred, succ;
+		int pred;
+		int succ;
 		if (index == size) {
 			succ = -1;
 			pred = last;

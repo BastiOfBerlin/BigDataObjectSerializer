@@ -105,7 +105,7 @@ public class UnsafeHelper {
 		}
 
 		final long end = destOffset + len;
-		for (long offset = destOffset; offset < end;) {
+		for (long offset = destOffset; offset < end; offset += stepSize) {
 			switch (stepSize) {
 			case LONG_FIELD_SIZE:
 				getUnsafe().putLong(dest, offset, getUnsafe().getLong(src, srcOffset));
@@ -122,7 +122,6 @@ public class UnsafeHelper {
 			default:
 				break;
 			}
-			offset += stepSize;
 			srcOffset += stepSize;
 		}
 	}

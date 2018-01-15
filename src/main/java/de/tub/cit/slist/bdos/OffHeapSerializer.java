@@ -50,8 +50,6 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	private final long	dynamicMemorySize;
 	/** optional byte array, can be used instead of native (off-heap) memory */
 	private byte[]		backingArray	= null;
-	/** offset of first field within object */
-	private final long	firstFieldOffset;
 	/** data size per element; <=> size of object excluding headers */
 	private final long	elementSize;
 	/** size of metadata */
@@ -87,8 +85,6 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 		classMetadata.putAll(wrapperAndPrimitivesMetadata);
 		acquireClassMetadata(baseClass);
 
-		this.firstFieldOffset = UnsafeHelper.firstFieldOffset(baseClass);
-		// this.elementSize = UnsafeHelper.sizeOf(baseClass) - this.firstFieldOffset;
 		this.elementSize = classMetadata.get(baseClass).getLength();
 		this.metadataSize = METADATA_STATUS_SIZE + metadataSize;
 		this.nodeSize = this.elementSize + this.metadataSize;
@@ -111,18 +107,18 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 		}
 
 		switch (config.getLocation()) {
-		case NATIVE_MEMORY:
-		default:
-			this.address = getUnsafe().allocateMemory(this.memorySize);
-			getUnsafe().setMemory(address, this.memorySize, (byte) 0);
-			this.dynamicMemoryStart = this.address + staticMemorySize;
-			break;
 		case BYTE_ARRAY:
 			if (this.memorySize > Integer.MAX_VALUE) throw new IllegalArgumentException(
 					"When using BYTE_ARRAY location, max. memory size is " + Integer.MAX_VALUE + ", tried to allocate " + this.memorySize);
 			this.backingArray = new byte[(int) this.memorySize];
 			this.address = UnsafeHelper.toAddress(this.backingArray) + Unsafe.ARRAY_BYTE_BASE_OFFSET;
 			this.dynamicMemoryStart = staticMemorySize;
+			break;
+		case NATIVE_MEMORY:
+		default:
+			this.address = getUnsafe().allocateMemory(this.memorySize);
+			getUnsafe().setMemory(address, this.memorySize, (byte) 0);
+			this.dynamicMemoryStart = this.address + staticMemorySize;
 			break;
 		}
 
@@ -159,10 +155,11 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 			return;
 		}
 
-		final ClassMetadata classMetadata = this.classMetadata.get(baseclass);
+		final ClassMetadata baseclassMetadata = this.classMetadata.get(baseclass);
 
-		long sOff, dOff;
-		for (final FieldMetadata field : classMetadata.getFields()) {
+		long sOff;
+		long dOff;
+		for (final FieldMetadata field : baseclassMetadata.getFields()) {
 			long subTypeLength;
 			// add corresponding field offsets offsets
 			if (direction == Direction.SERIALIZE) {
@@ -239,7 +236,8 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 						final Object arr = Array.newInstance(field.getClazz(), arrLength);
 						for (int i = 0; i < arrLength; i++) {
 							Object copyDest;
-							long copySrcOffset = 0, copyDestOffset = 0;
+							long copySrcOffset = 0;
+							long copyDestOffset = 0;
 							if (field.getClazz().isPrimitive()) {
 								copyDest = arr;
 								copyDestOffset = Unsafe.ARRAY_OBJECT_BASE_OFFSET + i * (long) UnsafeHelper.getPrimitiveLengths().get(field.getClazz());
@@ -423,16 +421,16 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	}
 
 	private void writeDynamicField(final FieldMetadata field, final Object src, final long sOff, final Object dest, final long dOff)
-			throws OutOfDynamicMemoryException, InstantiationException, IllegalAccessException {
+			throws InstantiationException, IllegalAccessException {
 		final Object copySrc = getUnsafe().getObject(src, sOff);
 		final boolean isNull = copySrc == null;
 		getUnsafe().putBoolean(dest, dOff, isNull);
+		long addr = getUnsafe().getLong(dest, dOff + UnsafeHelper.BOOLEAN_FIELD_SIZE);
 		if (isNull) {
 			getUnsafe().putLong(dest, dOff, Long.MIN_VALUE);
-		}
-		long addr = getUnsafe().getLong(dest, dOff + UnsafeHelper.BOOLEAN_FIELD_SIZE);
-		if (isNull && addr > 0) {
-			deallocateDynamicMemory(addr);
+			if (addr > 0) {
+				deallocateDynamicMemory(addr);
+			}
 			return;
 		}
 
@@ -507,7 +505,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	 * @return
 	 * @throws OutOfDynamicMemoryException
 	 */
-	private FreeBlockAddress findFirstFreeDynamicBlock(final long objectSize) throws OutOfDynamicMemoryException {
+	private FreeBlockAddress findFirstFreeDynamicBlock(final long objectSize) {
 		if (firstFreeDynamicBlock == 0)
 			throw new OutOfDynamicMemoryException(String.format("Cannot allocate %d bytes of dynamic memory.", objectSize + UnsafeHelper.LONG_FIELD_SIZE));
 		return findFreeDynamicBlock(objectSize, firstFreeDynamicBlock);
@@ -517,7 +515,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 		return findFreeDynamicBlock(objectSize, new FreeBlockAddress(blockAddr));
 	}
 
-	private FreeBlockAddress findFreeDynamicBlock(final long objectSize, final FreeBlockAddress blockAddr) throws OutOfDynamicMemoryException {
+	private FreeBlockAddress findFreeDynamicBlock(final long objectSize, final FreeBlockAddress blockAddr) {
 		if (getUnsafe().getLong(backingArray, blockAddr.address) > objectSize + UnsafeHelper.LONG_FIELD_SIZE)
 			return blockAddr;
 		else {
@@ -541,7 +539,7 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	 * @return start address of the new block
 	 * @throws OutOfDynamicMemoryException no block of sufficient size left
 	 */
-	private long allocateDynamicMemory(final long objectSize) throws OutOfDynamicMemoryException {
+	private long allocateDynamicMemory(final long objectSize) {
 		final FreeBlockAddress addr = findFirstFreeDynamicBlock(objectSize);
 		final long requiredSize = objectSize + DYNAMIC_METADATA_SIZE;
 		final long blockSize = getUnsafe().getLong(backingArray, addr.address);

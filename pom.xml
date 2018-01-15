@@ -16,11 +16,12 @@
 	<properties>
 		<project.build.sourceEncoding>utf-8</project.build.sourceEncoding>
 		<maven.build.timestamp.format>yyyy-MM-dd HH:mm</maven.build.timestamp.format>
+		<slf4j-version>1.7.25</slf4j-version>
 	</properties>
 	<prerequisites>
 		<maven>3.0.5</maven>
 	</prerequisites>
-	
+
 	<dependencyManagement>
 		<dependencies>
 			<dependency>
@@ -29,16 +30,35 @@
 				<version>4.12</version>
 				<scope>test</scope>
 			</dependency>
+			<dependency>
+				<groupId>org.slf4j</groupId>
+				<artifactId>slf4j-api</artifactId>
+				<version>${slf4j-version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.slf4j</groupId>
+				<artifactId>slf4j-simple</artifactId>
+				<version>${slf4j-version}</version>
+				<scope>test</scope>
+			</dependency>
 		</dependencies>
 	</dependencyManagement>
-	
+
 	<dependencies>
 		<dependency>
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>
 		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-api</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-simple</artifactId>
+		</dependency>
 	</dependencies>
-	
+
 	<build>
 		<finalName>BigDataObjectSerializer</finalName>
 		<defaultGoal>install</defaultGoal>

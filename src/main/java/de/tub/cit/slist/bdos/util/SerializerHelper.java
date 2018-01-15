@@ -19,6 +19,9 @@ import de.tub.cit.slist.bdos.metadata.FieldType;
 
 public class SerializerHelper {
 
+	private SerializerHelper() {
+	}
+
 	/**
 	 * get metadata for <code>baseclazz</code> and store it in <code>target</code>
 	 *
@@ -33,7 +36,8 @@ public class SerializerHelper {
 
 		Class<?> clazz = baseclazz;
 		final List<FieldMetadata> fields = new ArrayList<>();
-		long fieldLength, totalLength = 0;
+		long fieldLength = 0;
+		long totalLength = 0;
 		if (clazz.isPrimitive()) {
 			totalLength = UnsafeHelper.PRIMITIVE_LENGTHS.get(clazz);
 		} else {
