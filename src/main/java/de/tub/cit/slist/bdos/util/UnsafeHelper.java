@@ -172,7 +172,7 @@ public class UnsafeHelper {
 		// TODO Should be calculated based on the platform
 		// TODO maybe unsafe.addressSize() would help? but returns 8 for compressed pointers off..
 		// JVM_64 has a 12 byte header 8 + 4 (with compressed pointers on)
-		long len = OBJECT_SHELL_SIZE + OBJREF_SIZE;
+		long len = (long) OBJECT_SHELL_SIZE + OBJREF_SIZE;
 		if (clazz.isArray()) {
 			len += INT_FIELD_SIZE;
 		}
@@ -278,7 +278,7 @@ public class UnsafeHelper {
 			getUnsafe().copyMemory(bytes, Unsafe.ARRAY_BYTE_BASE_OFFSET, dest, destOffset, bytesToCopy);
 			if (bytesToCopy < length) {
 				// pad with NULs
-				getUnsafe().setMemory(dest, destOffset + bytesToCopy, length - bytesToCopy, (byte) 0);
+				getUnsafe().setMemory(dest, destOffset + bytesToCopy, (long) length - bytesToCopy, (byte) 0);
 			}
 			return cut;
 		} catch (final UnsupportedEncodingException e) {

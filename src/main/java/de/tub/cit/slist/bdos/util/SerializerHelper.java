@@ -74,7 +74,7 @@ public class SerializerHelper {
 							final FixedLength fixedLength = f.getAnnotation(FixedLength.class);
 							if (fixedLength != null) {
 								fieldMetadata.setType(FieldType.STRING_FIXED);
-								fieldLength = fixedLength.value() * UnsafeHelper.CHAR_FIELD_SIZE + UnsafeHelper.INT_FIELD_SIZE;
+								fieldLength = (long) fixedLength.value() * UnsafeHelper.CHAR_FIELD_SIZE + UnsafeHelper.INT_FIELD_SIZE;
 								fieldMetadata.setElements(fixedLength.value());
 							} else {
 								fieldMetadata.setType(FieldType.STRING);

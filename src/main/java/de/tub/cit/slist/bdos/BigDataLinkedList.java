@@ -667,7 +667,7 @@ public class BigDataLinkedList<T extends Serializable> extends AbstractSequentia
 			return x;
 		} else {
 			int x = last;
-			for (long l = size - 1; l > index; l--) {
+			for (int i = size - 1; i > index; i--) {
 				x = getPrevPointer(x);
 			}
 			return x;
