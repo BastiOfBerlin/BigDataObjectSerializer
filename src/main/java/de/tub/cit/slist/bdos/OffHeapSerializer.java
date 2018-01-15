@@ -22,7 +22,6 @@ import sun.misc.Unsafe;
  * @param <T> Size of T be computable. That means, that Generics must not be present in the object tree.
  */
 public class OffHeapSerializer<T extends Serializable> implements Serializable {
-
 	private static final long	serialVersionUID				= -6348155422688768649L;
 	/** size of the status metadata */
 	public static final int		METADATA_STATUS_SIZE			= 1;
@@ -69,6 +68,9 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	static {
 		wrapperAndPrimitivesMetadata = SerializerHelper.acquireWrapperAndPrimitivesMetadata();
 	}
+
+	// Messages
+	private static final String CANNOT_ALLOCATE_D_BYTES_OF_DYNAMIC_MEMORY = "Cannot allocate %d bytes of dynamic memory.";
 
 	public OffHeapSerializer(final Class<T> baseClass) {
 		this(baseClass, (new ConfigFactory()).withDefaults().build(), 0);
@@ -507,11 +509,11 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 	 */
 	private FreeBlockAddress findFirstFreeDynamicBlock(final long objectSize) {
 		if (firstFreeDynamicBlock == 0)
-			throw new OutOfDynamicMemoryException(String.format("Cannot allocate %d bytes of dynamic memory.", objectSize + UnsafeHelper.LONG_FIELD_SIZE));
+			throw new OutOfDynamicMemoryException(String.format(CANNOT_ALLOCATE_D_BYTES_OF_DYNAMIC_MEMORY, objectSize + UnsafeHelper.LONG_FIELD_SIZE));
 		return findFreeDynamicBlock(objectSize, firstFreeDynamicBlock);
 	}
 
-	private FreeBlockAddress findFreeDynamicBlock(final long objectSize, final long blockAddr) throws OutOfDynamicMemoryException {
+	private FreeBlockAddress findFreeDynamicBlock(final long objectSize, final long blockAddr) {
 		return findFreeDynamicBlock(objectSize, new FreeBlockAddress(blockAddr));
 	}
 
@@ -522,10 +524,10 @@ public class OffHeapSerializer<T extends Serializable> implements Serializable {
 			// look for next block
 			final long nextBlockAddr = blockAddr.address + FREE_LIST_NEXT_POINTER_OFFSET;
 			if (nextBlockAddr > dynamicMemorySize)
-				throw new OutOfDynamicMemoryException(String.format("Cannot allocate %d bytes of dynamic memory.", objectSize + UnsafeHelper.LONG_FIELD_SIZE));
+				throw new OutOfDynamicMemoryException(String.format(CANNOT_ALLOCATE_D_BYTES_OF_DYNAMIC_MEMORY, objectSize + UnsafeHelper.LONG_FIELD_SIZE));
 			final long nextBlock = getUnsafe().getLong(backingArray, nextBlockAddr);
 			if (nextBlock == 0) // last free block reached
-				throw new OutOfDynamicMemoryException(String.format("Cannot allocate %d bytes of dynamic memory.", objectSize + UnsafeHelper.LONG_FIELD_SIZE));
+				throw new OutOfDynamicMemoryException(String.format(CANNOT_ALLOCATE_D_BYTES_OF_DYNAMIC_MEMORY, objectSize + UnsafeHelper.LONG_FIELD_SIZE));
 			blockAddr.previousAddress = blockAddr.address;
 			blockAddr.address = nextBlock;
 			return findFreeDynamicBlock(objectSize, blockAddr);

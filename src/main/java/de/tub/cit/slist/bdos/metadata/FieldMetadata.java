@@ -20,22 +20,6 @@ public class FieldMetadata implements Comparable<FieldMetadata>, java.io.Seriali
 	/** Collection type */
 	private Class<?>	collectionClass;
 
-	public FieldMetadata() {
-	};
-
-	public FieldMetadata(final String fieldName, final long offset, final long serializedOffset, final long length, final int elements, final FieldType type,
-			final Class<?> clazz, final Class<?> collectionClass) {
-		super();
-		this.fieldName = fieldName;
-		this.offset = offset;
-		this.serializedOffset = serializedOffset;
-		this.length = length;
-		this.elements = elements;
-		this.type = type;
-		this.clazz = clazz;
-		this.collectionClass = collectionClass;
-	}
-
 	public String getFieldName() {
 		return fieldName;
 	}
@@ -128,7 +112,9 @@ public class FieldMetadata implements Comparable<FieldMetadata>, java.io.Seriali
 
 	@Override
 	public int compareTo(final FieldMetadata o) {
-		return (offset < o.offset ? -1 : (offset == o.offset ? 0 : 1));
+		if (offset < o.offset) return -1;
+		if (offset > o.offset) return 1;
+		return 0;
 	}
 
 }

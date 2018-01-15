@@ -81,7 +81,7 @@ public class ConfigFactory {
 	 *
 	 * @see {@link #withDefaults(File)}
 	 */
-	public ConfigFactory withDefaults(final String filename) throws FileNotFoundException, IOException {
+	public ConfigFactory withDefaults(final String filename) throws IOException {
 		return withDefaults(new File(filename));
 	}
 
@@ -95,7 +95,7 @@ public class ConfigFactory {
 	 *
 	 * @see {@link OHSConfig#loadPropertiesFromFile(File)}
 	 */
-	public ConfigFactory withDefaults(final File f) throws FileNotFoundException, IOException {
+	public ConfigFactory withDefaults(final File f) throws IOException {
 		config.loadPropertiesFromFile(f);
 		return this;
 	}
@@ -110,7 +110,7 @@ public class ConfigFactory {
 	 *
 	 * @see {@link OHSConfig#loadPropertiesFromStream(InputStream)}
 	 */
-	public ConfigFactory withDefaults(final InputStream stream) throws FileNotFoundException, IOException {
+	public ConfigFactory withDefaults(final InputStream stream) throws IOException {
 		config.loadPropertiesFromStream(stream);
 		return this;
 	}
