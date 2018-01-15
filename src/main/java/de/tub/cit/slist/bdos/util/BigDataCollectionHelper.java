@@ -4,6 +4,9 @@ import de.tub.cit.slist.bdos.OffHeapSerializer;
 
 public class BigDataCollectionHelper {
 
+	private BigDataCollectionHelper() {
+	}
+
 	/** offset of next pointer within metadata */
 	public static final int	NEXT_OFFSET	= 1;
 	/** offset of prev pointer within metadata */
